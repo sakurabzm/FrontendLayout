@@ -41,9 +41,127 @@ object LayoutTest {
   val InnerDiv =
     <.div(
       ^.position.relative,
-      ^.width      := InnerSize.px,
-      ^.height     := InnerSize.px,
-      ^.background := "#800")
+      ^.width      := 300.px,
+      ^.height     := 300.px,
+      ^.borderRadius := 15.px,
+      ^.background := "#800",
+      <.div(
+        ^.position.absolute,
+        ^.margin.auto,
+        ^.top := 0.px,
+        ^.left := 0.px,
+        ^.right := 0.px,
+        ^.bottom  := 0.px,
+        ^.width      := 100.px,
+        ^.height     := 100.px,
+        ^.borderRadius := 100.px,
+        ^.background := "#200",
+      )
+    )
+  val GenericAction =
+    <.div(
+      "Action",
+      ^.textAlign.center,
+      ^.display.`table-cell`,
+      ^.verticalAlign.middle,
+      ^.position.relative,
+      ^.width    := 100.px,
+      ^.height   := 60.px,
+      ^.borderRadius := 6.px,
+      ^.borderTop  := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft   := "solid 1px #000 ",
+      ^.borderRight  := "solid 1px #000 ",
+      ^.background := "#58ACFA"
+    )
+
+  val ReceiveAction =
+    <.div(
+      ^.position.relative,
+      ^.width   := 60.px,
+      ^.height  := 60.px,
+      ^.borderRadius  := 60.px,
+      ^.borderTop  := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft   := "solid 1px #000 ",
+      ^.borderRight  := "solid 1px #000 ",
+      ^.background := "#58ACFA",
+
+      <.div(
+        "R",
+        ^.textAlign.center,
+        ^.fontWeight.bold,
+        ^.position.absolute,
+        ^.width   := 30.px,
+        ^.height  := 20.px,
+        ^.margin.auto,
+        ^.top := 10.px,
+        ^.left := 0.px,
+        ^.right := 0.px,
+        ^.bottom  := 0.px,
+        ^.borderTop  := "solid 2px #000",
+        ^.borderBottom := "solid 2px #000",
+        ^.borderLeft   := "solid 2px #000 ",
+        ^.borderRight  := "solid 2px #000 ",
+        <.div(
+          ^.position.absolute,
+          "▽",
+          ^.transform := "scale(5.8,2)",
+          ^.top := (-15).px,
+          ^.left := 10.px
+        ),
+      )
+    )
+
+  val SendAction =
+    <.div(
+      ^.position.relative,
+      ^.width   := 60.px,
+      ^.height  := 60.px,
+      ^.borderRadius  := 60.px,
+      ^.borderTop  := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft   := "solid 1px #000 ",
+      ^.borderRight  := "solid 1px #000 ",
+      ^.background := "#58ACFA",
+
+      <.div(
+        "S",
+        ^.textAlign.center,
+        ^.fontWeight.bold,
+        ^.position.absolute,
+        ^.width   := 30.px,
+        ^.height  := 20.px,
+        ^.margin.auto,
+        ^.top := (0).px,
+        ^.left := 0.px,
+        ^.right := 0.px,
+        ^.bottom  := 0.px,
+        ^.borderTop  := "solid 2px #000",
+        ^.borderBottom := "solid 2px #000",
+        ^.borderLeft   := "solid 2px #000 ",
+        ^.borderRight  := "solid 2px #000 ",
+        <.div(
+          ^.position.absolute,
+          "▽",
+          ^.transform := "scale(5.5,1.8)",
+          ^.top := 11.px,
+          ^.left := 10.px
+        ),
+      ))
+
+  val EndAction =
+    <.div(
+      ^.position.relative,
+      ^.width   := 60.px,
+      ^.height  := 60.px,
+      ^.borderRadius  := 60.px,
+      ^.borderTop  := "solid 5px #000",
+      ^.borderBottom := "solid 5px #000",
+      ^.borderLeft   := "solid 5px #000 ",
+      ^.borderRight  := "solid 5px #000 ",
+      ^.background := "#B0C4DE",
+    )
 
   def moveOneAxis(pos: Int, steps: Int, max: Int): Int =
     (pos + steps * MoveDist) min (max - InnerSize) max 0
@@ -108,7 +226,24 @@ object LayoutTest {
           ^.draggable := true,
           ^.left := s.x.px,
           ^.top  := s.y.px
-        ))
+        ),
+        GenericAction(
+          ^.left := 100.px,
+          ^.top  := 100.px
+        ),
+        ReceiveAction(
+          ^.left := 150.px,
+          ^.top  := (-100).px
+        ),
+        SendAction(
+          ^.left := 400.px,
+          ^.top  := (-50).px
+        ),
+        EndAction(
+          ^.left := 400.px,
+          ^.top  := 0.px
+        )
+      )
   }
 
   val Main = ScalaComponent.builder[Unit]("Test Example")
