@@ -25,6 +25,8 @@ object LayoutTest {
   val OuterY    = 560
   val InnerSize =  24
   val MoveDist  =  24
+  var offsetx = 0
+  var offsety = 0
 
   case class State(x: Int, y: Int)
 
@@ -177,19 +179,25 @@ object LayoutTest {
         x = moveOneAxis(s.x, dx, OuterX),
         y = moveOneAxis(s.y, dy, OuterY)))
 
-    def moveState(sx: Int, sy: Int): Callback ={
-      $.modState(s => s.copy(
-        x = sx,
-        y = sy
-      ))
+
+    def dragStart(x: Int, y: Int)(e: ReactMouseEvent): Callback = {
+      offsetx = e.pageX.toInt - x
+      offsety = e.pageY.toInt - y
+      dom.console.info(s"start: $offsetx, $offsety")
+      Callback()
     }
 
-    def dragState(e: ReactMouseEvent): Callback ={
+    def dragState(e: ReactMouseEventFromHtml): Callback ={
       e.persist()
-      dom.console.info(e.pageX.toInt, e.pageY.toInt)
-//      moveState(OuterX, OuterY)
-//      moveState(e.pageX.toInt, e.pageY.toInt)
-      e.preventDefaultCB >> $.modState(s => s.copy(e.pageX.toInt, e.pageY.toInt))
+
+      var x = e.pageX.toInt
+      var y = e.pageY.toInt
+      dom.console.info(x,y)
+      if(x == 0 && y == 0)
+        return e.preventDefaultCB
+      x -= offsetx
+      y -= offsety
+      e.preventDefaultCB >> $.modState(s => s.copy(x, y))
     }
 
     def handleKey(e: ReactKeyboardEvent): Callback = {
@@ -221,6 +229,7 @@ object LayoutTest {
     def render(s: State) =
       OuterDiv.withRef(outerRef)(
         ^.onKeyDown ==> handleKey,
+        ^.onDragStart ==> dragStart(s.x, s.y),
         ^.onDrag ==> dragState,
         InnerDiv(
           ^.draggable := true,
