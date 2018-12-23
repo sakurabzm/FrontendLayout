@@ -22,7 +22,8 @@ libraryDependencies ++= Seq(
   "com.github.japgolly.scalajs-react" %%% "core" % "1.3.1",
   "com.github.japgolly.scalajs-react" %%% "extra" % "1.3.1",
   "com.olvind" %%% "scalajs-react-components" % "1.0.0-M2",
-  "org.scala-js" %%% "scalajs-dom" % "0.9.6"
+  "org.scala-js" %%% "scalajs-dom" % "0.9.6",
+  "com.github.japgolly.scalacss" %%% "ext-react" % "0.5.3"  // HU 01122018
   //  "org.scalatest" %%% "scalatest" % "3.0.0" % Test
 )
 

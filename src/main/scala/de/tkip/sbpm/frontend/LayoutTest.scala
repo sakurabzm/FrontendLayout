@@ -1,14 +1,15 @@
 package de.tkip.sbpm.frontend
+
 import org.scalajs.dom.html
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.html_<^._
 import org.scalajs.dom, dom.MouseEvent
 
 object LayoutTest {
-//
-//  def content = SingleSide.Content(source, Main2())
-//
-//  val source = GhPagesMacros.exampleSource
+  //
+  //  def content = SingleSide.Content(source, Main2())
+  //
+  //  val source = GhPagesMacros.exampleSource
 
   def component = ScalaComponent.static("Test example")(
     <.div(
@@ -16,15 +17,15 @@ object LayoutTest {
         <.br,
         "test test test"),
       <.br,
-     Main()))
+      Main()))
 
   // EXAMPLE:START
   import org.scalajs.dom.ext.KeyCode
 
-  val OuterX    = 1400
-  val OuterY    = 560
-  val InnerSize =  24
-  val MoveDist  =  24
+  val OuterX = 1400
+  val OuterY = 560
+  val InnerSize = 24
+  val MoveDist = 24
   var offsetx = 0
   var offsety = 0
 
@@ -34,17 +35,17 @@ object LayoutTest {
 
   val OuterDiv =
     <.div(
-      ^.tabIndex   := 0,
-      ^.width      := OuterX.px,
-      ^.height     := OuterY.px,
-      ^.border     := "solid 1px #333",
+      ^.tabIndex := 0,
+      ^.width := OuterX.px,
+      ^.height := OuterY.px,
+      ^.border := "solid 1px #333",
       ^.background := "#ddd")
 
   val InnerDiv =
     <.div(
       ^.position.relative,
-      ^.width      := 300.px,
-      ^.height     := 300.px,
+      ^.width := 300.px,
+      ^.height := 300.px,
       ^.borderRadius := 15.px,
       ^.background := "#800",
       <.div(
@@ -53,9 +54,9 @@ object LayoutTest {
         ^.top := 0.px,
         ^.left := 0.px,
         ^.right := 0.px,
-        ^.bottom  := 0.px,
-        ^.width      := 100.px,
-        ^.height     := 100.px,
+        ^.bottom := 0.px,
+        ^.width := 100.px,
+        ^.height := 100.px,
         ^.borderRadius := 100.px,
         ^.background := "#200",
       )
@@ -67,26 +68,26 @@ object LayoutTest {
       ^.display.`table-cell`,
       ^.verticalAlign.middle,
       ^.position.relative,
-      ^.width    := 100.px,
-      ^.height   := 60.px,
+      ^.width := 40.px,
+      ^.height := 40.px,
       ^.borderRadius := 6.px,
-      ^.borderTop  := "solid 1px #000",
+      ^.borderTop := "solid 1px #000",
       ^.borderBottom := "solid 1px #000",
-      ^.borderLeft   := "solid 1px #000 ",
-      ^.borderRight  := "solid 1px #000 ",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
       ^.background := "#58ACFA"
     )
 
   val ReceiveAction =
     <.div(
       ^.position.relative,
-      ^.width   := 60.px,
-      ^.height  := 60.px,
-      ^.borderRadius  := 60.px,
-      ^.borderTop  := "solid 1px #000",
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderRadius := 60.px,
+      ^.borderTop := "solid 1px #000",
       ^.borderBottom := "solid 1px #000",
-      ^.borderLeft   := "solid 1px #000 ",
-      ^.borderRight  := "solid 1px #000 ",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
       ^.background := "#58ACFA",
 
       <.div(
@@ -94,17 +95,17 @@ object LayoutTest {
         ^.textAlign.center,
         ^.fontWeight.bold,
         ^.position.absolute,
-        ^.width   := 30.px,
-        ^.height  := 20.px,
+        ^.width := 30.px,
+        ^.height := 20.px,
         ^.margin.auto,
         ^.top := 10.px,
         ^.left := 0.px,
         ^.right := 0.px,
-        ^.bottom  := 0.px,
-        ^.borderTop  := "solid 2px #000",
+        ^.bottom := 0.px,
+        ^.borderTop := "solid 2px #000",
         ^.borderBottom := "solid 2px #000",
-        ^.borderLeft   := "solid 2px #000 ",
-        ^.borderRight  := "solid 2px #000 ",
+        ^.borderLeft := "solid 2px #000 ",
+        ^.borderRight := "solid 2px #000 ",
         <.div(
           ^.position.absolute,
           "▽",
@@ -118,13 +119,13 @@ object LayoutTest {
   val SendAction =
     <.div(
       ^.position.relative,
-      ^.width   := 60.px,
-      ^.height  := 60.px,
-      ^.borderRadius  := 60.px,
-      ^.borderTop  := "solid 1px #000",
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderRadius := 60.px,
+      ^.borderTop := "solid 1px #000",
       ^.borderBottom := "solid 1px #000",
-      ^.borderLeft   := "solid 1px #000 ",
-      ^.borderRight  := "solid 1px #000 ",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
       ^.background := "#58ACFA",
 
       <.div(
@@ -132,21 +133,21 @@ object LayoutTest {
         ^.textAlign.center,
         ^.fontWeight.bold,
         ^.position.absolute,
-        ^.width   := 30.px,
-        ^.height  := 20.px,
+        ^.width := 30.px,
+        ^.height := 20.px,
         ^.margin.auto,
         ^.top := (0).px,
         ^.left := 0.px,
         ^.right := 0.px,
-        ^.bottom  := 0.px,
-        ^.borderTop  := "solid 2px #000",
+        ^.bottom := 0.px,
+        ^.borderTop := "solid 2px #000",
         ^.borderBottom := "solid 2px #000",
-        ^.borderLeft   := "solid 2px #000 ",
-        ^.borderRight  := "solid 2px #000 ",
+        ^.borderLeft := "solid 2px #000 ",
+        ^.borderRight := "solid 2px #000 ",
         <.div(
           ^.position.absolute,
           "▽",
-          ^.transform := "scale(5.5,1.8)",
+          ^.transform := "scale(5.3,1.8)",
           ^.top := 11.px,
           ^.left := 10.px
         ),
@@ -155,14 +156,431 @@ object LayoutTest {
   val EndAction =
     <.div(
       ^.position.relative,
-      ^.width   := 60.px,
-      ^.height  := 60.px,
-      ^.borderRadius  := 60.px,
-      ^.borderTop  := "solid 5px #000",
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderRadius := 60.px,
+      ^.borderTop := "solid 5px #000",
       ^.borderBottom := "solid 5px #000",
-      ^.borderLeft   := "solid 5px #000 ",
-      ^.borderRight  := "solid 5px #000 ",
+      ^.borderLeft := "solid 5px #000 ",
+      ^.borderRight := "solid 5px #000 ",
       ^.background := "#B0C4DE",
+    )
+  val ModelSplit =
+    <.div(
+      ^.position.relative,
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderRadius := 60.px,
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      ^.background := "#58ACFA",
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.top := 11.px,
+        ^.left := 12.px,
+        ^.borderTop := "solid 2px #000",
+        ^.borderBottom := "solid 2px #000",
+        ^.borderLeft := "solid 2px #000 ",
+        ^.borderRight := "solid 2px #000 "
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.top := 11.px,
+        ^.right := 12.px,
+        ^.borderTop := "solid 2px #000",
+        ^.borderBottom := "solid 2px #000",
+        ^.borderLeft := "solid 2px #000 ",
+        ^.borderRight := "solid 2px #000 "
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.bottom := 11.px,
+        ^.right := 12.px,
+        ^.borderTop := "dotted 2px #000",
+        ^.borderBottom := "dotted 2px #000",
+        ^.borderLeft := "dotted 2px #000 ",
+        ^.borderRight := "dotted 2px #000 "
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.bottom := 11.px,
+        ^.left := 12.px,
+        ^.borderTop := "dotted 2px #000",
+        ^.borderBottom := "dotted 2px #000",
+        ^.borderLeft := "dotted 2px #000 ",
+        ^.borderRight := "dotted 2px #000 "
+      )
+    )
+
+  val Cross =
+    <.div(
+      ^.position.relative,
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      ^.background := "#B0C4DE",
+      <.div(
+        ^.position.absolute,
+        ^.width := 80.px,
+        ^.height := 1.px,
+        ^.margin.auto,
+        ^.bottom := 0.px,
+        ^.right := 0.px,
+        ^.top := (0).px,
+        ^.left := (-10).px,
+        ^.background := "#000",
+        ^.transform := "rotate(45deg)"
+      )
+    )
+
+  val ModelJoin =
+    <.div(
+      ^.position.relative,
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderRadius := 60.px,
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      ^.background := "#58ACFA",
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.top := 11.px,
+        ^.left := 12.px,
+        ^.borderTop := "solid 2px #000",
+        ^.borderBottom := "solid 2px #000",
+        ^.borderLeft := "solid 2px #000 ",
+        ^.borderRight := "solid 2px #000 ",
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 2.px,
+          ^.margin.auto,
+          ^.bottom := 0.px,
+          ^.right := 0.px,
+          ^.top := (0).px,
+          ^.left := (-2).px,
+          ^.background := "#000",
+          ^.transform := "rotate(45deg)"
+        ),
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 2.px,
+          ^.margin.auto,
+          ^.bottom := (0).px,
+          ^.right := (0).px,
+          ^.top := (0).px,
+          ^.left := (-2).px,
+          ^.background := "#000",
+          ^.transform := "rotate(135deg)"
+        )
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.top := 11.px,
+        ^.right := 12.px,
+        ^.borderTop := "solid 2px #000",
+        ^.borderBottom := "solid 2px #000",
+        ^.borderLeft := "solid 2px #000 ",
+        ^.borderRight := "solid 2px #000 ",
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 2.px,
+          ^.margin.auto,
+          ^.bottom := 0.px,
+          ^.right := 0.px,
+          ^.top := (0).px,
+          ^.left := (-2).px,
+          ^.background := "#000",
+          ^.transform := "rotate(45deg)"
+        ),
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 2.px,
+          ^.margin.auto,
+          ^.bottom := (0).px,
+          ^.right := (0).px,
+          ^.top := (0).px,
+          ^.left := (-2).px,
+          ^.background := "#000",
+          ^.transform := "rotate(135deg)"
+        )
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.bottom := 11.px,
+        ^.left := 12.px,
+        ^.borderTop := "dotted 2px #000",
+        ^.borderBottom := "dotted 2px #000",
+        ^.borderLeft := "dotted 2px #000 ",
+        ^.borderRight := "dotted 2px #000 ",
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 2.px,
+          ^.margin.auto,
+          ^.bottom := 0.px,
+          ^.right := 0.px,
+          ^.top := (0).px,
+          ^.left := (-2).px,
+          ^.background := "#000",
+          ^.transform := "rotate(45deg)"
+        ),
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 2.px,
+          ^.margin.auto,
+          ^.bottom := (0).px,
+          ^.right := (0).px,
+          ^.top := (0).px,
+          ^.left := (-2).px,
+          ^.background := "#000",
+          ^.transform := "rotate(135deg)"
+        )
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 12.px,
+        ^.height := 12.px,
+        ^.bottom := 11.px,
+        ^.right := 12.px,
+        ^.borderTop := "dotted 2px #000",
+        ^.borderBottom := "dotted 2px #000",
+        ^.borderLeft := "dotted 2px #000 ",
+        ^.borderRight := "dotted 2px #000 "
+      )
+    )
+  val Merge =
+    <.div(
+      ^.position.relative,
+      ^.width := 60.px,
+      ^.height := 60.px,
+      ^.borderRadius := 60.px,
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      ^.background := "#58ACFA"
+    )
+
+  val Macro =
+    <.div(
+      "Macro:",
+      ^.fontWeight.bolder,
+      ^.textAlign.center,
+      ^.display.`table-cell`,
+      ^.verticalAlign.middle,
+      ^.position.relative,
+      ^.width := 90.px,
+      ^.height := 60.px,
+      ^.borderRadius := 6.px,
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      ^.background := "#58ACFA"
+
+    )
+
+  val NewReceiveS =
+    <.div(
+      ^.backgroundColor := "gold",
+     // ^.transform := "scale(0.6)",
+      ^.transformOrigin := "top",
+      ^.position.relative,
+      ^.width := 40.px,
+      ^.height := 40.px,
+      ^.borderRadius := 40.px,
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      <.div(
+        "R",
+        ^.textAlign.center,
+        ^.fontWeight.bold,
+        ^.position.absolute,
+        ^.overflow.auto,
+        ^.width := "50%",
+        ^.minWidth  := "25%",
+        ^.minHeight := "18.75%",
+        ^.height := "37.5%",
+        ^.margin.auto,
+        ^.top := 11.px,
+        ^.left := 0.px,
+        ^.right := 0.px,
+        ^.bottom := 0.px,
+        ^.borderTop := "solid 1px #000",
+        ^.borderBottom := "solid 1px #000",
+        ^.borderLeft := "solid 1px #000 ",
+        ^.borderRight := "solid 1px #000 "
+      ),
+      <.div(
+        ^.position.relative,
+        ^.marginTop := (11).px,
+        ^.marginLeft := 6.px,
+        ^.width := (28).px,
+        ^.height := 1.px,
+        ^.background := "#000",
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 1.px,
+          ^.top := (4).px,
+          ^.left := (-1).px,
+          ^.background := "#000",
+          ^.transform := "rotate(30deg)"
+        ),
+        <.div(
+          ^.position.absolute,
+          ^.width := 16.px,
+          ^.height := 1.px,
+          ^.top := (4).px,
+          ^.right := (-1).px,
+          ^.background := "#000",
+          ^.transform := "rotate(-30deg)"
+        )
+      )
+    )
+
+  val NewSendS =
+    <.div(
+      ^.position.relative,
+      ^.width := 40.px,
+      ^.height := 40.px,
+      ^.borderRadius := 40.px,
+      //^.transform := "scale(0.6)",
+      ^.transformOrigin := "top",
+      ^.borderTop := "solid 1px #000",
+      ^.borderBottom := "solid 1px #000",
+      ^.borderLeft := "solid 1px #000 ",
+      ^.borderRight := "solid 1px #000 ",
+      <.div(
+        ^.position.absolute,
+        ^.width := 20.px,
+        ^.height := 15.px,
+        ^.top := (11).px,
+        ^.left := 9.px,
+        ^.borderTop := "solid 1px #000",
+        ^.borderBottom := "solid 1px #000",
+        ^.borderLeft := "solid 1px #000 ",
+        ^.borderRight := "solid 1px #000 ",
+        <.p(
+          "S",
+          ^.textAlign.center,
+          ^.fontWeight.bold,
+          ^.marginTop := (-3).px
+        )
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.marginTop := (24).px,
+        ^.marginLeft := 10.px,
+        ^.width := (20).px,
+        ^.height := 1.px,
+        ^.background := "#000",
+        <.div(
+          ^.position.absolute,
+          ^.width := 12.px,
+          ^.height := 1.px,
+          ^.top := (4).px,
+          ^.left := (-1).px,
+          ^.background := "#000",
+          ^.transform := "rotate(30deg)"
+        ),
+        <.div(
+          ^.position.absolute,
+          ^.width := 12.px,
+          ^.height := 1.px,
+          ^.top := (4).px,
+          ^.right := (-1).px,
+          ^.background := "#000",
+          ^.transform := "rotate(-30deg)"
+        )
+      )
+    )
+  val Arrow =
+    <.div(
+      ^.position.relative,
+      ^.width := 120.px,
+      ^.height := 2.px,
+      ^.background := "#000",
+      ^.transformOrigin := "top left",
+      ^.transform := "rotate(-90deg)",
+      <.div(
+        ^.position.absolute,
+        ^.width := 10.px,
+        ^.height := 2.px,
+        ^.top := (2).px,
+        ^.left := (0).px,
+        ^.background := "#000",
+        ^.transform := "rotate(20deg)"
+      ),
+      <.div(
+        ^.position.absolute,
+        ^.width := 10.px,
+        ^.height := 2.px,
+        ^.top := (-2).px,
+        ^.left := (0).px,
+        ^.background := "#000",
+        ^.transform := "rotate(-20deg)"
+      ),
+    )
+  val Choice =
+    <.div(
+      ^.position.relative,
+      ^.display.flex,
+      ^.width := 80.px,
+      ^.height := 80.px,
+     // ^.backgroundColor := "red",
+      ^.border := "solid 2px black",
+      //^.transform := "rotate(45deg)",
+     // ^.transformOrigin := "left"
+      ^.transform := "scale(0.3)"
+//      <.div(
+//        "te ",
+//        ^.width := 20.px,
+//        ^.height:= 20.px,
+//        ^.backgroundColor := "pink"
+//      ),
+//      <.div(
+//        "te",
+//        ^.marginLeft := 5.px,
+//        ^.width := 20.px,
+//        ^.height:= 20.px,
+//        ^.backgroundColor := "pink"
+//      ),
+//      <.div(
+//        "te",
+//        ^.marginLeft := 5.px,
+//        ^.width := 20.px,
+//        ^.height:= 20.px,
+//        ^.backgroundColor := "pink"
+//      )
     )
 
   def moveOneAxis(pos: Int, steps: Int, max: Int): Int =
@@ -187,13 +605,13 @@ object LayoutTest {
       Callback()
     }
 
-    def dragState(e: ReactMouseEventFromHtml): Callback ={
+    def dragState(e: ReactMouseEventFromHtml): Callback = {
       e.persist()
 
       var x = e.pageX.toInt
       var y = e.pageY.toInt
-      dom.console.info(x,y)
-      if(x == 0 && y == 0)
+      dom.console.info(x, y)
+      if (x == 0 && y == 0)
         return e.preventDefaultCB
       x -= offsetx
       y -= offsety
@@ -202,23 +620,23 @@ object LayoutTest {
 
     def handleKey(e: ReactKeyboardEvent): Callback = {
 
-      def plainKey: CallbackOption[Unit] =             // CallbackOption will stop if a key isn't matched
+      def plainKey: CallbackOption[Unit] = // CallbackOption will stop if a key isn't matched
         CallbackOption.keyCodeSwitch(e) {
-          case KeyCode.Up    => move(0, -1)
-          case KeyCode.Down  => move(0,  1)
-          case KeyCode.Left  => move(-1, 0)
-          case KeyCode.Right => move( 1, 0)
+          case KeyCode.Up => move(0, -1)
+          case KeyCode.Down => move(0, 1)
+          case KeyCode.Left => move(-1, 0)
+          case KeyCode.Right => move(1, 0)
         }
 
-      def ctrlKey: CallbackOption[Unit] =              // Like above but if ctrlKey is pressed
+      def ctrlKey: CallbackOption[Unit] = // Like above but if ctrlKey is pressed
         CallbackOption.keyCodeSwitch(e, ctrlKey = true) {
-          case KeyCode.Up    => move(0, -OuterY)
-          case KeyCode.Down  => move(0,  OuterY)
-          case KeyCode.Left  => move(-OuterX, 0)
-          case KeyCode.Right => move( OuterX, 0)
+          case KeyCode.Up => move(0, -OuterY)
+          case KeyCode.Down => move(0, OuterY)
+          case KeyCode.Left => move(-OuterX, 0)
+          case KeyCode.Right => move(OuterX, 0)
         }
 
-      (plainKey orElse ctrlKey) >> e.preventDefaultCB  // This is the interesting part.
+      (plainKey orElse ctrlKey) >> e.preventDefaultCB // This is the interesting part.
       //
       // orElse joins CallbackOptions so if one fails, it tries the other.
       //
@@ -234,24 +652,46 @@ object LayoutTest {
         InnerDiv(
           ^.draggable := true,
           ^.left := s.x.px,
-          ^.top  := s.y.px
+          ^.top := s.y.px
         ),
         GenericAction(
           ^.left := 100.px,
-          ^.top  := 100.px
+          ^.top := 100.px
         ),
-        ReceiveAction(
+        //        ReceiveAction(
+        //          ^.left := 150.px,
+        //          ^.top  := (-100).px
+        //        ),
+        //SendAction(
+        NewSendS(
+          ^.left := 400.px,
+          ^.top := (-50).px
+        ),
+        Arrow(
+          ^.left := 400.px,
+          ^.top := 0.px
+        ),
+        ModelSplit(
+          ^.left := 200.px,
+          ^.top := (-500).px
+        ),
+        ModelJoin(
+          ^.left := 300.px,
+          ^.top := (-200).px
+        ),
+        Merge(
+          ^.left := 500.px,
+          ^.top := (-600).px
+        ),
+        //        Macro(
+        //          ^.left := 500.px,
+        //          ^.top  := (-500).px
+        //        ),
+        NewReceiveS(
           ^.left := 150.px,
-          ^.top  := (-100).px
-        ),
-        SendAction(
-          ^.left := 400.px,
-          ^.top  := (-50).px
-        ),
-        EndAction(
-          ^.left := 400.px,
-          ^.top  := 0.px
+          ^.top := (-500).px
         )
+
       )
   }
 
