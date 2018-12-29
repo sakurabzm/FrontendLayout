@@ -1,5 +1,6 @@
 package de.tkip.sbpm.frontend.pages
 
+import de.tkip.sbpm.frontend.Data.{StateData, TransitionData}
 import de.tkip.sbpm.frontend.graph.{Graph, StateGraph}
 import scalacss.Defaults._
 import scalacss.ScalaCssReact._
@@ -59,7 +60,7 @@ object InternalBehaviorPage {
   var isSelected: StateGraph = null
   var preState: StateGraph = null
   var preStateC: (Int, Int) = null // 只存当前state的前一个state的坐标
-  var preModifyState: (Int, Boolean, (String, Boolean, String, String)) = null
+  var preModifyState: (Int, Boolean, (String, Boolean, String)) = null
   var flag = true // flag is true, state setting; flag is false, transition setting.
   val startInitialX = 680
   val startInitialY = 50
@@ -165,6 +166,10 @@ object InternalBehaviorPage {
           eventMap += (item.onDragStartKey -> onDragStartEvent(item))
           eventMap += (item.onDragKey -> onDragEvent(item))
           item.content(eventMap)
+        },
+        statesList.toTagMod { item =>
+          val eventMap: Map[String, TagMod] = Map()
+          item.arrowsToTarget.map(_.content(eventMap)).toVdomArray
         }
       )
     }
@@ -205,35 +210,35 @@ object InternalBehaviorPage {
             <.br,
             <.select(
               <.option("Action",
-                if ((isSelected != null) && (isSelected.stateType == "Action")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Action")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("Send",
-                if ((isSelected != null) && (isSelected.stateType == "Send")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Send")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("Receive",
-                if ((isSelected != null) && (isSelected.stateType == "Receive")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Receive")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("Model Join",
-                if ((isSelected != null) && (isSelected.stateType == "Model Join")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Model Join")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("Model Split",
-                if ((isSelected != null) && (isSelected.stateType == "Model Split")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Model Split")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("Merge",
-                if ((isSelected != null) && (isSelected.stateType == "Merge")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Merge")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("Macro",
-                if ((isSelected != null) && (isSelected.stateType == "Macro")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "Macro")) {
                   ^.selected := true
                 } else ^.selected := false),
               <.option("End",
-                if ((isSelected != null) && (isSelected.stateType == "End")) {
+                if ((isSelected != null) && (isSelected.data.stateType == "End")) {
                   ^.selected := true
                 } else ^.selected := false),
               ^.onChange ==> changeStateType(isSelected)
@@ -250,7 +255,8 @@ object InternalBehaviorPage {
               ^.maxWidth := 140.px,
               ^.minWidth := 140.px,
               if (isSelected != null)
-                ^.value := isSelected.getMessageType
+//                ^.value := isSelected.getMessageType
+                ^.value := ""
               else ^.value := "Input messageType",
               ^.onChange ==> changeMessageTypeValue(isSelected)
 
@@ -267,7 +273,7 @@ object InternalBehaviorPage {
               ^.maxWidth := 140.px,
               ^.minWidth := 140.px,
               if (isSelected != null)
-                ^.value := isSelected.getDescription
+                ^.value := isSelected.data.description
               else ^.value := "",
               ^.onChange ==> changeDescription(isSelected)
             )
@@ -287,7 +293,6 @@ object InternalBehaviorPage {
             "Cancel",
             ^.onClick --> cancelUpdate(isSelected))
         )
-
       )
     }
 
@@ -381,20 +386,23 @@ object InternalBehaviorPage {
     def createCorrespondingState: Callback = {
       stateIndex match {
         case "Action" => {
-          val s = Graph.Action()
+          val sd = new StateData(Graph.setId)
+          val s = new Graph.Action(sd)
           dom.console.info("action action ")
           statesList += s
           positionOfAdd(s)
           $.modState(s => State(statesList))
         }
         case "Send" => {
-          val s = Graph.Send()
+          val sd = new StateData(Graph.setId)
+          val s = new Graph.Send(sd)
           statesList += s
           positionOfAdd(s)
           $.modState(s => State(statesList))
         }
         case "Receive" => {
-          val s = Graph.Receive()
+          val sd = new StateData(Graph.setId)
+          val s = new Graph.Receive(sd)
           statesList += s
           positionOfAdd(s)
           $.modState(s => State(statesList))
@@ -420,7 +428,8 @@ object InternalBehaviorPage {
         //          $.modState(s => State(statesList))
         //        }
         case "End" => {
-          val s = Graph.End()
+          val sd = new StateData(Graph.setId)
+          val s = new Graph.End(sd)
           statesList += s
           positionOfAdd(s)
           $.modState(s => State(statesList))
@@ -451,7 +460,7 @@ object InternalBehaviorPage {
     def startStateCheckbox() = {
       if (isSelected != null) {
         <.input.checkbox(
-          ^.checked := isSelected.isStartState,
+          ^.checked := isSelected.data.isStartState,
           ^.onChange --> setStartState
         )
       } else {
@@ -463,28 +472,34 @@ object InternalBehaviorPage {
 
     def changeStateType(s: StateGraph)(e: ReactEventFromInput): Callback = {
       val newST = e.target.value
-      s.setStateType(newST)
+      s.data.setStateType(newST)
       $.modState(s => s)
     }
 
     def setStartState: Callback = {
-      if (isSelected.isStartState == true) {
-        isSelected.setIsStartState(false)
+      if (isSelected.data.isStartState == true) {
+        isSelected.data.isStartState = false
       } else {
-        isSelected.setIsStartState(true)
+        isSelected.data.isStartState = true
       }
       $.modState(s => s)
     }
 
     def changeMessageTypeValue(s: StateGraph)(e: ReactEventFromInput): Callback = {
       val msg = e.target.value
-      s.setMessageType(msg)
+      if(s.isInstanceOf[Graph.Receive]){
+        s.asInstanceOf[Graph.Receive].setMessageType(msg)
+      }
+      if(s.isInstanceOf[Graph.Send]){
+        s.asInstanceOf[Graph.Send].setMessageType(msg)
+      }
+
       $.modState(s => s)
     }
 
     def changeDescription(s: StateGraph)(e: ReactEventFromInput): Callback = {
       val dsc = e.target.value
-      s.setDescription(dsc)
+      s.data.description = dsc
       $.modState(s => s)
     }
 
@@ -494,7 +509,7 @@ object InternalBehaviorPage {
 
     def selectedEvent(graph: StateGraph): Callback = {
       if (isSelected != null) {
-        if (isSelected.ID == graph.ID) {
+        if (isSelected.data.ID == graph.data.ID) {
           isSelected.resetBorder
           //restoreStateDate(isSelected)
           isSelected = null
@@ -503,25 +518,27 @@ object InternalBehaviorPage {
           isSelected.resetBorder
          // restoreStateDate(isSelected)
           isSelected = graph // current selected state
-          preModifyState = (isSelected.ID, false,
-            (isSelected.stateType, isSelected.isStartState, isSelected.messageType, isSelected.description))
+          preModifyState = (isSelected.data.ID, false,
+            (isSelected.data.stateType, isSelected.data.isStartState, isSelected.data.description))
           isSelected.changeBorder("solid 2px #191970")
 
           if ((preState == null) || (preStateC == null)) { // There is no preState to need to be connected.
           } else {
             isSelected.setCoordinate(preStateC._1, preStateC._2 + 120) // 120是箭头长度，常量
-            coordinateSet += (isSelected.ID -> (preStateC._1, preStateC._2 + 120))
+            coordinateSet += (isSelected.data.ID -> (preStateC._1, preStateC._2 + 120))
             defaultStateList -= isSelected
-            val s = new Graph.Arrow(preState.sx, preState.sy, isSelected.sx, isSelected.sy)
-            statesList += s
+            val ad = new TransitionData(preState.data, isSelected.data)
+            val arrow = new Graph.Arrow(ad, preState.sx, preState.sy, isSelected.sx, isSelected.sy)
+            preState.arrowsToTarget += arrow
+            isSelected.arrowsFromSource += arrow
             preStateC = null
           }
         }
       } else {
         isSelected = graph
         // 记录state之前的数据
-        preModifyState = (isSelected.ID, false,
-          (isSelected.stateType, isSelected.isStartState, isSelected.messageType, isSelected.description))
+        preModifyState = (isSelected.data.ID, false,
+          (isSelected.data.stateType, isSelected.data.isStartState,  isSelected.data.description))
         isSelected.changeBorder("solid 2px #191970")
       }
       $.modState(s => s)
@@ -552,6 +569,8 @@ object InternalBehaviorPage {
       x -= offsetx
       y -= offsety
       graph.setCoordinate(x, y)
+      graph.arrowsFromSource.foreach(f => f.changeTargetCoordinate(x, y))
+      graph.arrowsToTarget.foreach(f => f.changeSourceCoordinate(x, y))
 //      dom.console.info("move to: " + x,y)
       e.preventDefaultCB >> $.modState(s => s)
     }
@@ -564,8 +583,8 @@ object InternalBehaviorPage {
         if(defaultStateList.contains(preState)){
           dom.console.info(" 同在编辑区域，不连接  " + defaultStateList)
         }else{
-          if (coordinateSet.contains(preState.ID)) {
-            preStateC = coordinateSet(preState.ID)
+          if (coordinateSet.contains(preState.data.ID)) {
+            preStateC = coordinateSet(preState.data.ID)
             dom.console.info("This preState coordinate.  " + preStateC)
           }else dom.console.info("This state doesn't exist.")
         }
@@ -573,23 +592,20 @@ object InternalBehaviorPage {
       }
     }
 
-    def modifyState(s: String): StateGraph = {
+    def modifyState(s: String, sd: StateData): StateGraph = {
       s match {
-        case "Action" => Graph.Action()
-        case "Receive" => Graph.Receive()
-        case "Send" => Graph.Send()
-        case "End" => Graph.End()
+        case "Action" => new Graph.Action(sd)
+        case "Receive" => new Graph.Receive(sd)
+        case "Send" => new Graph.Send(sd)
+        case "End" => new Graph.End(sd)
       }
     }
 
     def modifyStateContent(s: StateGraph): StateGraph = {
-      val newSt = s.stateType
-      val newState = modifyState(newSt)
-      newState.setID(s.ID)
-      newState.setMessageType(s.messageType)
-      newState.setDescription(s.description)
+      val newSt = s.data.stateType
+      val newState = modifyState(newSt, s.data)
       for (i <- statesList.indices) {
-        if (statesList(i).ID == newState.ID)
+        if (statesList(i).data.ID == newState.data.ID)
           statesList.update(i, newState)
       }
       // 选中才变
@@ -602,18 +618,18 @@ object InternalBehaviorPage {
     var lastCoordinate: (Int, Int) = null
 
     def updateState: Callback = {
-      if (isSelected.ID == preModifyState._1) { // 确保是同一state
-        if (isSelected.isStartState) { //起始点
+      if (isSelected.data.ID == preModifyState._1) { // 确保是同一state
+        if (isSelected.data.isStartState) { //起始点
           if (!existStart) {
             isSelected.setCoordinate(startInitialX, startInitialY)
             existStart = true
             //确保同一state数据一致
-            val data = (isSelected.getStateType, isSelected.getIsStartState, isSelected.getMessageType, isSelected.getDescription)
-            preModifyState = (isSelected.ID, true, data)
+            val data = (isSelected.data.stateType, isSelected.data.isStartState,  isSelected.data.description)
+            preModifyState = (isSelected.data.ID, true, data)
             //从defaultStateList删除更新好的state
             defaultStateList -= isSelected
             dom.console.info("sjfakf " + defaultStateList)
-            coordinateSet += (isSelected.ID -> (startInitialX, startInitialY))
+            coordinateSet += (isSelected.data.ID -> (startInitialX, startInitialY))
             lastCoordinate = (startInitialX, startInitialY)
 
           } else {
@@ -624,8 +640,8 @@ object InternalBehaviorPage {
           $.modState(s => s)
         } else { // 非起始点
           if (coordinateSet.size != 0) {
-            val data = (isSelected.getStateType, isSelected.getIsStartState, isSelected.getMessageType, isSelected.getDescription)
-            preModifyState = (isSelected.ID, true, data)
+            val data = (isSelected.data.stateType, isSelected.data.isStartState, isSelected.data.description)
+            preModifyState = (isSelected.data.ID, true, data)
             $.modState(s => s)
           } else Callback.alert("Please select StartState!")
         }
@@ -682,13 +698,12 @@ object InternalBehaviorPage {
     }
 
     def restoreStateDate(s: StateGraph) = {
-      if (s.ID == preModifyState._1) {
+      if (s.data.ID == preModifyState._1) {
         if (!preModifyState._2) {
           val oldData = preModifyState._3
-          s.setStateType(oldData._1)
-          s.setIsStartState(oldData._2)
-          s.setMessageType(oldData._3)
-          s.setDescription(oldData._4)
+          s.data.stateType = oldData._1
+          s.data.isStartState = oldData._2
+          s.data.description = oldData._3
         } else {
           dom.console.info("PreState is updated!")
         }

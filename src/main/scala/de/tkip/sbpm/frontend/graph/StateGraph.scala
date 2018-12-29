@@ -5,19 +5,19 @@ import scalacss.ScalaCssReact._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.html_<^._
 import org.scalajs.dom
-import scala.collection.mutable.Map
 
-sealed abstract class StateGraph() {
+import scala.collection.mutable.{ListBuffer, Map}
+import de.tkip.sbpm.frontend.Data.{StateData, TransitionData}
+
+sealed abstract class StateGraph(stateData: StateData) {
   def content(eventMap: Map[String, TagMod]): TagMod
-  var ID: Int
-  var stateType: String
-  var isStartState = false
-  var messageType: String
-  var description: String
   var border: String = "solid 2px #B0C4DE"
+  val data = stateData
   val onClickKey = "1"
   val onDragStartKey = "2"
   val onDragKey = "3"
+  val arrowsToTarget: ListBuffer[Graph.Arrow] = ListBuffer()
+  val arrowsFromSource: ListBuffer[Graph.Arrow] = ListBuffer()
 
   def changeBorder(b: String): Unit = {
     border = b
@@ -25,42 +25,6 @@ sealed abstract class StateGraph() {
 
   def resetBorder = {
     border = "solid 2px #B0C4DE"
-  }
-
-  def setID(id: Int) = {
-    ID = id
-  }
-
-  def getStateType: String = {
-    stateType
-  }
-
-  def setStateType(st: String) = {
-    stateType = st
-  }
-
-  def getIsStartState: Boolean = {
-    isStartState
-  }
-
-  def setIsStartState(ss: Boolean) = {
-    isStartState = ss
-  }
-
-  def getMessageType: String = {
-    messageType
-  }
-
-  def setMessageType(msgT: String) = {
-    messageType = msgT
-  }
-
-  def getDescription: String = {
-    description
-  }
-
-  def setDescription(comment: String) = {
-    description = comment
   }
 
   /*
@@ -75,7 +39,7 @@ sealed abstract class StateGraph() {
   }
 
   override def equals(o: Any) = o match {
-    case that: StateGraph => that.ID == this.ID
+    case that: StateGraph => that.data.ID == this.data.ID
     case _ => false
   }
 }
@@ -91,11 +55,14 @@ object Graph {
     sId
   }
 
-  case class Receive() extends StateGraph {
-    override var stateType = "Receive"
-    override var ID: Int = setId
-    override var messageType = "Receive state test"
-    override var description = "Receive receive receive"
+  class Receive(stateData: StateData) extends StateGraph(stateData: StateData) {
+    data.stateType = "Receive"
+    data.description = "Receive receive receive"
+    var messageType = "Receive state test"
+
+    def setMessageType(msgt: String): Unit ={
+      messageType = msgt
+    }
 
     def content(eventMap: Map[String, TagMod]) = {
       <.div(
@@ -168,11 +135,14 @@ object Graph {
 
   }
 
-  case class Send() extends StateGraph {
-    override var stateType = "Send"
-    override var ID: Int = setId
-    override var messageType = "send state test"
-    override var description = "send send send"
+  class Send(stateData: StateData) extends StateGraph(stateData: StateData) {
+    data.stateType = "Send"
+    data.description = "send send send"
+    var messageType = "send state test"
+
+    def setMessageType(msgt: String): Unit ={
+      messageType = msgt
+    }
 
     def content(eventMap: Map[String, TagMod]) = {
       <.div(
@@ -239,11 +209,9 @@ object Graph {
   }
 
 
-  case class Action() extends StateGraph {
-    override var stateType = "Action"
-    override var ID: Int = setId
-    override var messageType = "Action state test"
-    override var description = "Action Action Action"
+  class Action(stateData: StateData) extends StateGraph(stateData: StateData) {
+    data.stateType = "Action"
+    data.description = "Action Action Action"
 
     def content(eventMap: Map[String, TagMod]) = {
       <.div(
@@ -268,12 +236,10 @@ object Graph {
   }
 
 
-  case class End() extends StateGraph {
+  class End(stateData: StateData) extends StateGraph(stateData: StateData) {
 
-    override var stateType = "End"
-    override var ID: Int = setId
-    override var messageType = "End state test"
-    override var description = "End End End"
+    data.stateType = "End"
+    data.description = "End End End"
 
     def content(eventMap: Map[String, TagMod]) = {
       <.div(
@@ -572,19 +538,30 @@ object Graph {
   //      )
   //    }
   //  }
-  case class Arrow(_x1: Int, _y1: Int, _x2: Int, _y2: Int) extends StateGraph {
-    override var stateType = "Receive"
-    override var ID: Int = setId
-    override var messageType = "test test test"
-    override var description = "test test test"
+  class Arrow(tr: TransitionData, _x1: Int, _y1: Int, _x2: Int, _y2: Int) {
     var x1 = _x1
     var y1 = _y1
     var x2 = _x2
     var y2 = _y2
-    var length = Math.sqrt(Math.pow(Math.abs(x1-x2),2) + Math.pow(Math.abs(y1-y2),2)).toInt
-    var angle = (Math.atan((x1 - x2)/(y1 - y2)) * (180/Math.PI))
-    dom.console.info(x1,y1,x2,y2,length,angle)
+    def length: Double = Math.sqrt(Math.pow(Math.abs(x1-x2),2) + Math.pow(Math.abs(y1-y2),2)).formatted("%.2f").toDouble
+    def arc: Double = Math.asin((x1 - x2)/length).formatted("%.2f").toDouble
+    def angle: Double = {
+      if(y2 < y1){
+        -180 - (arc * (180.0/Math.PI)).formatted("%.2f").toDouble
+      }else{
+        (arc * (180.0/Math.PI)).formatted("%.2f").toDouble
+      }
+    }
 
+    def changeSourceCoordinate(x: Int, y: Int): Unit ={
+      x1 = x
+      y1 = y
+    }
+
+    def changeTargetCoordinate(x: Int, y: Int): Unit ={
+      x2 = x
+      y2 = y
+    }
 
     def content(eventMap: Map[String, TagMod]) = {
       <.div(
@@ -594,8 +571,8 @@ object Graph {
         ^.left := x1.px,
         ^.top := y1.px,
         ^.background := "#000",
-        ^.transformOrigin := "top left",  // 基点角度不对
-        ^.transform := s"rotate(${angle * -1}deg)",
+        ^.transformOrigin := "top left",
+        ^.transform := s"rotate(${angle}deg)",
         <.div(
           ^.position.absolute,
           ^.width := 2.px,
