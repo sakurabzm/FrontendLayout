@@ -1,4 +1,5 @@
 package de.tkip.sbpm.frontend.pages
+
 import scalacss.Defaults._
 import scalacss.ScalaCssReact._
 import de.tkip.sbpm.frontend.components.LeftNav
@@ -10,29 +11,31 @@ import org.scalajs.dom
 
 object ItemsPage {
 
-  object Style extends StyleSheet.Inline {
-    import dsl._
-    val container = style(display.flex, minHeight(600.px), borderTop :=! "1px solid rgb(223, 220, 200)") // body of item
+    object Style extends StyleSheet.Inline {
 
-    val nav =
-      style(width :=! 205.px, borderRight :=! "1px solid rgb(223, 220, 200)", backgroundColor :=! c"#E6E6E6" ) // LeftNav Setting
+        import dsl._
 
-    val content = style(padding(30.px)) // content of container
-  }
+        val container = style(display.flex, width :=! "100%", height(600.px), borderTop :=! "1px solid rgb(223, 220, 200)") // body of item
 
-  val component = ScalaComponent
-    .builder[Props]("ItemsPage")
-    .render_P { P =>
-      <.div(
-        Style.container,
-        <.div(Style.nav,
-          LeftNav(LeftNav.Props(Item.menu, P.selectedPage, P.ctrl))),
-        <.div(Style.content, P.selectedPage.render())
-      )
+        val nav =
+            style(width :=! "15%", borderRight :=! "1px solid rgb(223, 220, 200)", backgroundColor :=! c"#E6E6E6") // LeftNav Setting
+
+        val content = style(padding(30.px)) // content of container
     }
-    .build
 
-  case class Props(selectedPage: Item, ctrl: RouterCtl[Item])
+    val component = ScalaComponent
+            .builder[Props]("ItemsPage")
+            .render_P { P =>
+                <.div(
+                    Style.container,
+                    <.div(Style.nav,
+                        LeftNav(LeftNav.Props(Item.menu, P.selectedPage, P.ctrl))),
+                    <.div(P.selectedPage.render())
+                )
+            }
+            .build
 
-  def apply(props: Props) = component(props).vdomElement
+    case class Props(selectedPage: Item, ctrl: RouterCtl[Item])
+
+    def apply(props: Props) = component(props).vdomElement
 }

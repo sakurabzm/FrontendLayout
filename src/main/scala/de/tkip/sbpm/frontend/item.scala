@@ -1,7 +1,6 @@
 package de.tkip.sbpm.frontend
 
-import de.tkip.sbpm.frontend.components.itmes.{Item1Data, ProcessList, ItemsInfo}
-import de.tkip.sbpm.frontend.pages.ItemsPage
+import de.tkip.sbpm.frontend.pages.{ItemsPage, ListProcesses}
 import japgolly.scalajs.react.extra.router.RouterConfigDsl
 import japgolly.scalajs.react.vdom.VdomElement
 
@@ -11,21 +10,17 @@ sealed abstract class Item(val title: String,
 
 object Item {
 
-  case object Info extends Item("Info", "info", () => ItemsInfo())
+    case object Process extends Item("Process", "Process", () => ListProcesses())
 
-  case object Item1 extends Item("undefined", "undefined", () => Item1Data())
+    val menu = Vector(Process)
 
-  case object Process extends Item("Process", "Process", () => ProcessList())
-
-  val menu = Vector(Info, Item1, Process)
-
-  val routes = RouterConfigDsl[Item].buildRule { dsl =>
-    import dsl._
-    menu
-      .map { i =>
-        staticRoute(i.routerPath, i) ~> renderR(
-          r => ItemsPage(ItemsPage.Props(i, r)))
-      }
-      .reduce(_ | _)
-  }
+    val routes = RouterConfigDsl[Item].buildRule { dsl =>
+        import dsl._
+        menu
+                .map { i =>
+                    staticRoute(i.routerPath, i) ~> renderR(
+                        r => ItemsPage(ItemsPage.Props(i, r)))
+                }
+                .reduce(_ | _)
+    }
 }
