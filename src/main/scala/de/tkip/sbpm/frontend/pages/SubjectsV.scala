@@ -1,20 +1,23 @@
 package de.tkip.sbpm.frontend.pages
 
-import de.tkip.sbpm.frontend.AppRouter.SubjectsVP
+import de.tkip.sbpm.frontend.AppRouter.{Home, SubjectsVP, config}
 import de.tkip.sbpm.frontend.Data._
-import de.tkip.sbpm.frontend.components.LoadButtonComponents
 import de.tkip.sbpm.frontend.graph._
 import scalacss.Defaults._
 import scalacss.ScalaCssReact._
 import japgolly.scalajs.react._
-import japgolly.scalajs.react.extra.router.RouterCtl
+import japgolly.scalajs.react.extra.router._
 import japgolly.scalajs.react.vdom.html_<^._
+import japgolly.scalajs.react._
 import org.scalajs.dom
 
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Map, Set}
 
 object SubjectsV {
+
+    val (router, lgc) = Router.componentAndLogic(BaseUrl.fromWindowOrigin_/, config)
+    val ctl = lgc.ctl
 
     object Style extends StyleSheet.Inline {
 
@@ -108,6 +111,11 @@ object SubjectsV {
     }
 
     class Backend(val $: BackendScope[Unit, State]) {
+        if(!ProcessManager.processMap.contains(processID)){
+//            ctl.set(Home).runNow()
+            val url = "http://localhost:8080/"
+            dom.window.location.href = url
+        }
         val subjectsList: ListBuffer[SubjectData] = ProcessManager.processMap(processID).subjectList
 
         def render(s: State) = {
@@ -367,7 +375,7 @@ object SubjectsV {
         }
 
         def addSubject(): Callback = {
-            val newSubjectData = new SubjectData(getNewId, "Subject", false, "default", 100, 1, "")
+            val newSubjectData = new SubjectData(getNewId, s"Subject$getNewId", false, "default", 0, 1, "")
             ProcessManager.processMap(processID).addSubject(newSubjectData) // newSubject has been added.
             if (subjectsList.size == 1) {
                 newSubjectData.subjectX = 150
@@ -607,7 +615,6 @@ object SubjectsV {
         }
 
         def deleteSubject(): Callback = {
-            dom.console.info("我是测试第7步")
             //modify coordinate of each subject
             var keepX = 0
             var keepY = 0
@@ -639,7 +646,7 @@ object SubjectsV {
                 interaction._2.foreach(relatedInformation => {
                     if (relatedInformation._1 == isSelected.id) {
                         relatedInformation._2.foreach(tr => {
-                            currentSub.arrowMap(tr).data.information.setRelatedSubjectName("")
+                            currentSub.arrowMap(tr).data.information.addRelatedSubjectName("")
                         })
                     }
                 })
@@ -649,7 +656,7 @@ object SubjectsV {
                 interaction._2.foreach(relatedInformation => {
                     if (relatedInformation._1 == isSelected.id) {
                         relatedInformation._2.foreach(tr => {
-                            currentSub.arrowMap(tr).data.information.setRelatedSubjectName("")
+                            currentSub.arrowMap(tr).data.information.addRelatedSubjectName("")
                         })
                     }
                 })
@@ -730,14 +737,15 @@ object SubjectsV {
         }
 
         def interactionRelationship = {
-//            dom.console.info("我是第一步")
             val num = ProcessManager.processMap(processID).subjectList.size
             for (i <- 0 until num) {
                 val currentSubject = ProcessManager.processMap(processID).subjectList(i)
                 currentSubject.stateList.foreach(actionState => {
                     if (actionState.isInstanceOf[GraphObject.Receive]) {
                         val currentReceiveState = actionState.asInstanceOf[GraphObject.Receive]
-                        val entireTransitionList = currentReceiveState.data.directChildrenTransitionsList ++ currentReceiveState.data.nonDirectChildrenTransitionsList
+                        val entireTransitionList: ListBuffer[TransitionData] = ListBuffer()
+                        currentReceiveState.data.directChildrenTransitionsMap.values.foreach(f => entireTransitionList ++= f)
+                        currentReceiveState.data.nonDirectChildrenTransitionsMap.values.foreach(f => entireTransitionList ++= f)
                         for (elem <- entireTransitionList) {
                             //elem is TransitionData
                             val msgType = elem.information.relatedMessageType
@@ -785,7 +793,9 @@ object SubjectsV {
 
                     if (actionState.isInstanceOf[GraphObject.Send]) {
                         val currentSendState = actionState.asInstanceOf[GraphObject.Send]
-                        val entireTransitionList = currentSendState.data.directChildrenTransitionsList ++ currentSendState.data.nonDirectChildrenTransitionsList
+                        val entireTransitionList: ListBuffer[TransitionData] = ListBuffer()
+                        currentSendState.data.directChildrenTransitionsMap.values.foreach(f => entireTransitionList ++= f)
+                        currentSendState.data.nonDirectChildrenTransitionsMap.values.foreach(f => entireTransitionList ++= f)
                         for (elem <- entireTransitionList) {
                             val msgType = elem.information.relatedMessageType
                             val subName = elem.information.relatedSubjectName
@@ -833,9 +843,6 @@ object SubjectsV {
 
         // sort points of each subject
         def sortPoints = { // case class Point()
-            dom.console.info("我是第二步")
-            dom.console.info("subjectSendState " + subjectSendState)
-            dom.console.info("subjectReceive " + subjectReceiveState)
             subjectSendState.foreach(s => {
                 val currentStartSubject = ProcessManager.processMap(processID).subjectMap(s._1.toString)
                 currentStartSubject.exitPoints += "up" -> ListBuffer()
@@ -912,7 +919,6 @@ object SubjectsV {
 
         // allocate coordinate to each point
         def allocateCoordinate: Unit = {
-            dom.console.info("我是第三步")
             ProcessManager.processMap(processID).subjectList.foreach(s => {
                 // up arrow
                 if (s.exitPoints.contains("up")) {
@@ -1075,7 +1081,6 @@ object SubjectsV {
         }
 
         def reverse = {
-            dom.console.info("我是第四步")
             subjectPosition.foreach(idP => {
                 subjectPositionReversedMap += (idP._2 -> idP._1)
             })
@@ -1142,7 +1147,6 @@ object SubjectsV {
         }
 
         def pair(exitSubjectSequence: Map[Int, Map[String, ListBuffer[Int]]]) = {
-            dom.console.info("我是第六步")
             val direction = List("up", "bottom", "left", "right")
             subjectsList.foreach(s => {
                 val sourceSubjectID = s.id
@@ -1406,7 +1410,8 @@ object SubjectsV {
         }
 
         def drawArrowOfSubject(a: InteractionData): VdomElement = { // 箭头方向，起点坐标， 终点坐标
-            dom.console.info("我是第七步")
+            //todo 暂时右拐
+//            a.direction = "right"
             val startX = a.start._1
             val startY = a.start._2
             val endX = a.end._1
@@ -1615,8 +1620,10 @@ object SubjectsV {
             finalBottomArrowMap.clear()
             communicationList.clear()
             subjectPosition.clear() // 实时定位，如果没有这一步，之前删除的subject的Id仍然保留
-            for (i <- 0 until subjectsList.size) {
-                subjectPosition += subjectsList(i).id -> (i + 1)
+            var i = 1
+            for (item <- (subjectsList.sortBy(s => s.id.toInt))) {
+                subjectPosition += item.id -> i
+                i += 1
             }
             subjectReceiveState.clear()
             subjectSendState.clear()
@@ -1751,7 +1758,7 @@ object SubjectsV {
     }
 
     val Main = ScalaComponent.builder[Unit]("SubjectsPage")
-            .initialState(State(ProcessManager.processMap(processID).subjectList))
+            .initialState(State(ProcessManager.processMap(processID).subjectList.sortBy(f =>{f.id})))
             .renderBackend[Backend]
             .build
 

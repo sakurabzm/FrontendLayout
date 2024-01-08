@@ -21,7 +21,7 @@ object TemplateTest {
             textAlign.center,
             width :=! "100%",
             fontSize(30.px),
-            minHeight(500.px),
+//            minHeight(500.px),
             paddingTop(40.px)
         )
 
@@ -33,8 +33,23 @@ object TemplateTest {
                 .static("HomePage")(
                     <.div(
                         Style.content,
+//                        ^.minHeight := "100vh",
+                        ^.height := "auto",
+                        ^.height := "100%",
+                        ^.flex  := "1",
                         <.div(
+//                            ^.minHeight := "80vh",
                             "Welcome to S-BPM"
+                        ),
+                        <.footer(
+                            ^.position.absolute,
+                            ^.width := "100%",
+//                            ^.marginTop := "-60px",
+                            ^.height := "60px",
+//                            ^.clear := "both",
+                            ^.textAlign.center,
+                            <.div(^.borderTop := "1px solid grey", ^.padding := "0px"),
+                            <.p(^.paddingTop := "2px", " footer2 S-BPM template")
                         )
                     )
                 )

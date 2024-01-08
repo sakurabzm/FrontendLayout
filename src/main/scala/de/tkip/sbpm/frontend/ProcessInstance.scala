@@ -39,7 +39,6 @@ case class Subject(id: Int, x: Int, y: Int) {
     }
 
     def behaviorPage() = Callback {
-        println("id: " + subjectid)
         val url = "http://localhost:8080/#subjects/" + subjectid
         dom.window.location.href = url
     }

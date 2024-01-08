@@ -6,8 +6,9 @@ case class TestGraph() {
 
     val g = new RGraph
 
-    var s = new Vertex("g")
+    var s = new Vertex("start")
     s.ntype = "s"
+    var v0 = new Vertex("g")
     var v1 = new Vertex("a")
     var v2 = new Vertex("b")
     var v3 = new Vertex("c")
@@ -15,10 +16,12 @@ case class TestGraph() {
     var v5 = new Vertex("d")
     var v6 = new Vertex("j")
     var v7 = new Vertex("h")
-    v7.ntype = "t"
+    var e = new Vertex("end")
+    e.ntype = "t"
 
     g.createMateInfo()
     g.addVertex(s)
+    g.addVertex(v0)
     g.addVertex(v1)
     g.addVertex(v2)
     g.addVertex(v3)
@@ -26,9 +29,11 @@ case class TestGraph() {
     g.addVertex(v5)
     g.addVertex(v6)
     g.addVertex(v7)
+    g.addVertex(e)
 
-    g.addEdge(s, v1)
-    g.addEdge(s, v4)
+    g.addEdge(s, v0)
+    g.addEdge(v0, v1)
+    g.addEdge(v0, v4)
     g.addEdge(v1, v2)
     g.addEdge(v2, v3)
     g.addEdge(v3, v7)
@@ -36,6 +41,7 @@ case class TestGraph() {
     g.addEdge(v5, v6)
     g.addEdge(v6, v7)
     g.addEdge(v6, v4)
+    g.addEdge(v7, e)
 
 
 //    var s = new Vertex("s")

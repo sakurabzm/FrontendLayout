@@ -61,8 +61,9 @@ object ListProcesses {
                     ^.position.absolute,
                     ^.display.flex,
                     ^.margin := 0.px,
+//                    ^.minHeight := "100vh",
                     ^.width := "85%",
-                    ^.height := 600.px,
+                    ^.height := "100%",
                     <.div(
                         <.div(
                             ^.position.absolute,
@@ -72,7 +73,7 @@ object ListProcesses {
                             ^.backgroundColor := "LightSteelBlue ",
                             <.button(
                                 Style.labelStyle,
-                                ^.width := 150.px,
+                                ^.width := "12%",
                                 ^.color := "#006400",
                                 ^.fontWeight.bold,
                                 "New process",
@@ -81,7 +82,7 @@ object ListProcesses {
                             ),
                             <.button(
                                 Style.labelStyle,
-                                ^.width := 150.px,
+                                ^.width := "12%",
                                 ^.color := "#FF4500",
                                 ^.fontWeight.bold,
                                 "Delete",
@@ -89,10 +90,10 @@ object ListProcesses {
                             ),
                             <.button(
                                 Style.labelStyle,
-                                ^.width := 150.px,
+                                ^.width := "12%",
                                 ^.color := "#0000FF",
                                 ^.fontWeight.bold,
-                                "Batch Management",
+                                "Management",
                                 ^.cursor.pointer,
                                 ^.onClick --> onVisibilityChange(s)
                             ),
@@ -104,7 +105,7 @@ object ListProcesses {
                             ^.marginLeft := 0.px,
                             ^.marginTop := 50.px,
                             ^.width := "80%",
-                            ^.height := 550.px,
+                            ^.height := "83%",
                             ^.overflowX.scroll,
                             ^.overflowY.scroll,
                             <.ul(
@@ -138,7 +139,7 @@ object ListProcesses {
                         ^.marginLeft := "80%",
                         ^.backgroundColor := "#E6E6E6",
                         ^.width := "20%",
-                        ^.height := 600.px,
+                        ^.height := "90%",
                         <.ul(
                             ^.listStyle := "none",
                             <.label(
@@ -206,9 +207,8 @@ object ListProcesses {
                     ^.position.relative,
                     ^.display.flex,
                     ^.marginLeft := "80%",
-                    //^.backgroundColor := "red",
-                    ^.width := 500.px,
-                    ^.height := 500.px,
+                    ^.width := "80%",
+                    ^.height := "83%",
                     <.ul(
                         ^.listStyle := "none",
                         <.label(
@@ -319,10 +319,8 @@ object ListProcesses {
         var currentProcessID: Int = 0
 
         def setProcessID(s: State): Int = {
-            if (s.processes.size == 0) {
-                currentProcessID
-            } else {
-                currentProcessID = s.processes.last.id.toInt + 1
+            if (s.processes.nonEmpty) {
+                currentProcessID = s.processes.maxBy(f => f.id.toInt).id.toInt + 1
             }
             currentProcessID
         }
@@ -331,7 +329,7 @@ object ListProcesses {
 //            genericDate = new java.util.Date().toString
             val newID = setProcessID(s).toString
             val newItem = new ProcessData(newID, processAuthor, processName, processDescription)
-            s.processes += newItem
+            s.processes.+=:(newItem)
             ProcessManager.processMap += (newID -> newItem)
             flag = true
             $.modState(s => s)
@@ -401,7 +399,7 @@ object ListProcesses {
     val processList: ListBuffer[ProcessData] = ListBuffer()
 
     val component = ScalaComponent.builder[Unit]("ProcessList")
-            .initialState(State(processList, "hidden"))
+            .initialState(State(processList.sortBy(_.nameOfProcess), "hidden"))
             .renderBackend[Backend]
             .build
 

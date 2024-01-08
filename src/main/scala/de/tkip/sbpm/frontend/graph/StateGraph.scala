@@ -35,18 +35,20 @@ sealed abstract class StateGraph(processid: String, subjectid: String, stateData
 
     var border: String = "solid 2px #B0C4DE"
     val data = stateData
-    var deep: Int = -1
+    var deep: Int = 0
     var arrowsToTarget: ListBuffer[Int] = ListBuffer()
     var arrowsFromSource: ListBuffer[Int] = ListBuffer()
     var graphWidth: Int
     var parentID: Int = -1
-    var childrenList: ListBuffer[Int] = ListBuffer()
+    var childrenList: ListBuffer[Int] = ListBuffer() //
     var descendantList: ListBuffer[Int] = ListBuffer()
     var sign: Boolean = false
     var lock: Boolean = false
     var dragging: Boolean = false
     var currentBackgroundColor: String = "#B0C4DE"
-    var spacex, spacey = 0
+    var spacex, spacey, sx, sy = 0
+
+
 
     def changeBorder = {
         border = "solid 2px #DC143C"
@@ -76,6 +78,14 @@ sealed abstract class StateGraph(processid: String, subjectid: String, stateData
         sign = false
     }
 
+    def setParent(id: Int): Unit ={
+        parentID = id
+    }
+
+    def setDeep(d: Int): Unit ={
+        deep = d
+    }
+
     def setSpaceX(x: Int): Unit = {
         spacex = x
     }
@@ -87,8 +97,14 @@ sealed abstract class StateGraph(processid: String, subjectid: String, stateData
     /*
     coordinate(x, y)
      */
-    var sx = 0
-    var sy = 0
+
+    def setX(x: Int): Unit ={
+        sx = x
+    }
+
+    def setY(y: Int): Unit ={
+        sy = y
+    }
 
     def setCoordinate(x: Int, y: Int) = {
         sx = x
@@ -101,7 +117,7 @@ sealed abstract class StateGraph(processid: String, subjectid: String, stateData
     }
 
     override def toString: String = {
-        s"id: ${data.id}, name: ${data.stateName}, arrows to target: $arrowsToTarget, arrows frome source: $arrowsFromSource"
+        s"id: ${data.id}, name: ${data.stateName}, parent: ${parentID},childrenlist: ${childrenList}, descendantList: ${descendantList}, childMap: ${data.directChildrenTransitionsMap}, descendantMap: ${data.nonDirectChildrenTransitionsMap}"
     }
 
 }
@@ -119,6 +135,9 @@ object GraphObject {
         val textStyle = style(
             userSelect := "none",
             cursor.pointer
+        )
+        val whitespaceStyle = style(
+            whiteSpace := "pre"
         )
 
     }
@@ -143,6 +162,18 @@ object GraphObject {
         "IsIPEmpty" -> (31, 37)
     )
 
+    def getSymbolCenter(s: StateGraph): (Int, Int) = {
+        if (s.data.stateType == "Action") {
+            if (s.data.stateName.length <= 8) {
+                symbolCenter(s.data.stateType)
+            } else {
+                ((Math.min(s.data.stateName.length, 18) * 8) / 2, 20)
+            }
+        } else {
+            symbolCenter(s.data.stateType)
+        }
+    }
+
     val circle: ListBuffer[String] = ListBuffer("Send", "Receive", "ModalJoin", "ModalSplit")
 
 
@@ -165,7 +196,6 @@ object GraphObject {
     }
 
     class Receive(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
-        data.description = "Receive receive receive"
         override var graphWidth: Int = 40
 
         override def content(eventMap: Map[String, TagMod]) = {
@@ -268,8 +298,6 @@ object GraphObject {
     }
 
     class Send(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
-        data.description = "send send send"
-
         override var graphWidth: Int = 40
 
         def content(eventMap: Map[String, TagMod]) = {
@@ -338,12 +366,19 @@ object GraphObject {
     }
 
     class Action(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
-        data.description = "Action Action Action"
-        override var graphWidth: Int = changeWidth(data.stateName)
+
+        def name:String = {
+            if(data.stateName.length > 18)
+                data.stateName.substring(0, 15) + ".."
+            else
+                data.stateName
+        }
+
+        override var graphWidth: Int = changeWidth(name)
 
         def changeWidth(n: String): Int = {
             if (n.length > 8) {
-                n.length * 10
+                n.length * 8
             } else {
                 80
             }
@@ -352,13 +387,13 @@ object GraphObject {
 
         def content(eventMap: Map[String, TagMod]) = {
             <.label(
-                data.stateName,
+                name,
                 Style.textStyle,
                 ^.fontSize := 12.px,
                 ^.position.absolute,
                 ^.left := sx.px,
                 ^.top := sy.px,
-                ^.width := changeWidth(data.stateName).px,
+                ^.width := changeWidth(name).px,
                 ^.minWidth := 80.px,
                 ^.height := 40.px,
                 ^.lineHeight := 40.px,
@@ -414,7 +449,6 @@ object GraphObject {
 
     class End(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-       data.description = "End End End"
         override var graphWidth: Int = 44
 
         def content(eventMap: Map[String, TagMod]) = {
@@ -437,7 +471,6 @@ object GraphObject {
 
     class ModalJoin(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "Join Join"
         override var graphWidth: Int = 40
 
         def content(eventMap: Map[String, TagMod]) = {
@@ -567,7 +600,6 @@ object GraphObject {
 
     class ModalSplit(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "Split Split"
         override var graphWidth: Int = 40
 
         def content(eventMap: Map[String, TagMod]) = {
@@ -624,7 +656,6 @@ object GraphObject {
 
     class Tau(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "Tau Tau Tau"
         override var graphWidth: Int = 80
 
 
@@ -660,7 +691,7 @@ object GraphObject {
     }
 
     class OpenIP(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
-        data.description = "OpenIP OpenIP OpenIP"
+
         override var graphWidth: Int = 80
 
 
@@ -720,7 +751,6 @@ object GraphObject {
 
     class CloseIP(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "CloseIP CloseIP CloseIP"
         override var graphWidth: Int = 80
 
 
@@ -771,7 +801,7 @@ object GraphObject {
     }
 
     class IsIPEmpty(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
-        data.description = "IsIPEmpty IsIPEmpty IsIPEmpty"
+
         override var graphWidth: Int = 60
 
 
@@ -810,7 +840,6 @@ object GraphObject {
 
     class CloseAllIPs(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "CloseAllIPs CloseAllIPs CloseAllIPs"
         override var graphWidth: Int = 80
 
         def content(eventMap: Map[String, TagMod]) = {
@@ -858,7 +887,6 @@ object GraphObject {
 
     class OpenAllIPs(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "OpenAllIPs OpenAllIPs OpenAllIPs"
         override var graphWidth: Int = 80
 
 
@@ -899,7 +927,6 @@ object GraphObject {
 
     class SelectAgents(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "SelectAgents SelectAgents SelectAgents"
         override var graphWidth: Int = 80
 
         def content(eventMap: Map[String, TagMod]) = {
@@ -939,7 +966,6 @@ object GraphObject {
 
     class CallMacro(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "CallMacro CallMacro CallMacro"
         override var graphWidth: Int = 80
         stateData.setStateName("test")
 
@@ -994,7 +1020,6 @@ object GraphObject {
 
     class VarMan(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "VarMan VarMan VarMan"
         override var graphWidth: Int = 80
 
 
@@ -1048,7 +1073,6 @@ object GraphObject {
 
     class Cancel(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
 
-        data.description = "Cancel Cancel Cancel"
         override var graphWidth: Int = 80
 
 
@@ -1097,19 +1121,20 @@ object GraphObject {
     }
 
     class DummyNode(processid: String, subjectid: String, stateData: StateData) extends StateGraph(processid: String, subjectid: String, stateData: StateData) {
+        println("a dummy node!")
         data.description = "It's just a dummy node!"
         override var graphWidth: Int = 80
 
         def content(eventMap: Map[String, TagMod]) = {
             <.div(
-                ^.left := sx.px,
-                ^.top := sy.px,
-                ^.position.absolute,
-                ^.width := 40.px,
-                ^.height := 40.px,
-                ^.borderRadius := 40.px,
-                ^.border := "dashed 2px red",
-                ^.backgroundColor := "yellow"
+//                ^.left := sx.px,
+//                ^.top := sy.px,
+//                ^.position.absolute,
+//                ^.width := 40.px,
+//                ^.height := 40.px,
+//                ^.borderRadius := 40.px,
+//                ^.border := "dashed 2px red",
+//                ^.backgroundColor := "yellow"
             )
         }
     }
@@ -1123,35 +1148,41 @@ object GraphObject {
         var processID = processid
         var subjectID = subjectid
         var backgroundColor = "#000"
-        var borderStyle = transitionStyle(tr)
         var spacex, spacey = 0
         var aType = arrowType
+        var isBackEdge = false
+        var colored = false
+        def borderStyle = transitionStyle(tr)
 
         def transitionStyle(data: TransitionData): String = {
-            var currentType = data.transitionType
-            currentType match {
-                case "" => {
-                    currentType = "solid 2px #6A00FF"
-                    currentType
+            data.transitionType match {
+                case "cancel" => {
+                    if(!colored)
+                        "solid 2px #6A00FF"
+                    else
+                        "solid 2px red"
                 }
-
-                case "implicit" => {
-                    currentType = "dashed 2px black"
-                    currentType
+                case "hidden" => {
+                    if(!colored)
+                        "dashed 2px black"
+                    else
+                        "dashed 2px red"
                 }
                 case _ => {
-                    currentType = "solid 2px black"
-                    currentType
+                    if(!colored)
+                        "solid 2px black"
+                    else
+                        "solid 2px red"
                 }
             }
         }
 
         def changeColor = {
-            borderStyle = "solid 2px red"
+            colored = true
         }
 
         def resetColor = {
-            borderStyle = transitionStyle(tr)
+            colored = false
         }
 
         def setSpaceX(x: Int): Unit = {
@@ -1160,6 +1191,16 @@ object GraphObject {
 
         def setSpaceY(y: Int): Unit = {
             spacey = y
+        }
+
+        def changeX(a: Int, b: Int): Unit ={
+            x1 = a
+            x2 = b
+        }
+
+        def chageY(a: Int, b: Int): Unit ={
+            y1 = a
+            y2 = b
         }
 
         def changeSourceCoordinate(x: Int, y: Int): Unit = {
@@ -1172,56 +1213,72 @@ object GraphObject {
             y2 = y
         }
 
+        def changeData(d: TransitionData): Unit ={
+            data = d
+        }
 
         def content(eventMap: Map[String, TagMod]) = {
 
-            if(rpst){
+            if(isBackEdge){
+                drawLeftTopArrowPolyline(x1 - 40, y1 - 20, x2 - 40, y2 + 20, data, borderStyle, eventMap)
+            }else if(rpst){
                 drawArrow(x1, y1, x2, y2, data, borderStyle, eventMap)
             }else{
                 arrowType match {
                     case "1" => drawArrow(x1, y1, x2, y2, data, borderStyle, eventMap)
-                    case "2" => drawLeftDownArrowPolyline(x1, y1, x2, y2, data, borderStyle, eventMap)
+                    case "2" => drawDownLeftArrow(x1, y1, x2, y2, data, borderStyle, eventMap)
                     case "3" => drawRightTopArrowPolyline(x1, y1, x2, y2, data, borderStyle, eventMap)
                     case "4" => drawRightDownArrowPolyline(x1, y1, x2, y2, data, borderStyle, eventMap)
                     case "5" => drawLeftTopArrowPolyline(x1, y1, x2, y2, data, borderStyle, eventMap)
                     case "6" => drawCircle(processID, subjectID, x1, y1, x2, y2, data, borderStyle, eventMap)
                     case "7" => drawRightAngleRightDown(processID, subjectID, x1, y1, x2, y2, data, borderStyle, eventMap)
                     case "8" => drawRightAngleRightUp(processID, subjectID, x1, y1, x2, y2, data, borderStyle, eventMap)
+                    case "9" => drawLeftArrow(x1, y1, x2, y2, data, borderStyle, eventMap)
+                    case "10" => drawRightArrow(x1, y1, x2, y2, data, borderStyle, eventMap)
+                    case "11" => drawLeftDownArrowPolyline(x1, y1, x2, y2, data, borderStyle, eventMap)
                 }
             }
         }
 
+        override def toString: String = {
+            s"type: $arrowType"
+        }
     }
 
 
-    def multiTransition(currentData: StateGraph, processID: String, subjectID: String) = {
+    def multiTransition(currentData: StateGraph, processID: String, subjectID: String): TagMod = {
         if (!currentData.dragging && !currentData.rpst) {
             if (currentData.childrenList.size > 1) {
                 val firstChildID = currentData.childrenList.head
                 val lastChildID = currentData.childrenList.last
                 val firstChild = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap(firstChildID)
                 val lastChild = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap(lastChildID)
-                val firstChildCenter = symbolCenter(firstChild.data.stateType)
-                val lastChildCenter = symbolCenter(lastChild.data.stateType)
+                val firstChildCenter = getSymbolCenter(firstChild)
+                val lastChildCenter = getSymbolCenter(lastChild)
                 val firstChildX = firstChild.sx + firstChildCenter._1
                 val lastChildX = lastChild.sx + lastChildCenter._1
-                val currentStateCenter = symbolCenter(currentData.data.stateType)
-                multiArrow(firstChildX, lastChildX, currentStateCenter, currentData.data.stateType, "1", currentData.sx)
-            } else {
-                if (currentData.childrenList.size == 1) {
-                    val uniqueChild = currentData.childrenList.head
-                    val child = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap(uniqueChild)
-                    val childCenter = symbolCenter(child.data.stateType)
-                    val currentStateCenter = symbolCenter(currentData.data.stateType)
-                    if (math.abs((child.sx + childCenter._1) - (currentData.sx + currentStateCenter._1)) <= 30) {
-                        <.div()
-                    } else {
-                        multiArrow((currentData.sx + currentStateCenter._1), (child.sx + childCenter._1), currentStateCenter, currentData.data.stateType, "2", currentData.sx)
-                    }
-                } else {
-                    <.div()
-                }
-            }
+                val currentStateCenter = getSymbolCenter(currentData)
+                if(firstChildX < lastChildX)
+                    multiArrow(firstChildX, lastChildX, currentStateCenter, currentData.data.stateType, "1", currentData.sx)
+                else
+                    multiArrow(lastChildX, firstChildX, currentStateCenter, currentData.data.stateType, "1", currentData.sx)
+            }else
+                <.div()
+//            else {
+//                if (currentData.childrenList.size == 1) {
+//                    val uniqueChild = currentData.childrenList.head
+//                    val child = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap(uniqueChild)
+//                    val childCenter = symbolCenter(child.data.stateType)
+//                    val currentStateCenter = symbolCenter(currentData.data.stateType)
+//                    if (math.abs((child.sx + childCenter._1) - (currentData.sx + currentStateCenter._1)) <= 30) {
+//                        <.div()
+//                    } else {
+//                        multiArrow((currentData.sx + currentStateCenter._1), (child.sx + childCenter._1), currentStateCenter, currentData.data.stateType, "2", currentData.sx)
+//                    }
+//                } else {
+//                    <.div()
+//                }
+//            }
         } else {
             <.div()
         }
@@ -1233,24 +1290,24 @@ object GraphObject {
         val currentTransitionType = data.transitionType
         currentTransitionType match {
             case "normal" => {
-                if (data.information.action == "Send") {
-                    if ((data.information.relatedSubjectName != "" || data.information.relatedMessageType != "")) {
+                if (data.information.actionType == "Send") {
+//                    if ((data.information.relatedSubjectName != "" || data.information.relatedMessageType != "")) {
                         showInformation = "Msg: (" + data.information.relatedMessageType + ") To: (" + data.information.relatedSubjectName + ")"
-                    } else {
-                        showInformation = ""
-
-                    }
+//                    } else {
+//                        showInformation = ""
+//
+//                    }
                 }
-                if (data.information.action == "Receive") {
-                    if ((data.information.relatedSubjectName != "" || data.information.relatedMessageType != "")) {
+                if (data.information.actionType == "Receive") {
+//                    if ((data.information.relatedSubjectName != "" || data.information.relatedMessageType != "")) {
                         showInformation = "Msg: (" + data.information.relatedMessageType + ")  From: (" + data.information.relatedSubjectName + ")"
-
-                    } else {
-                        showInformation = ""
-                    }
+//
+//                    } else {
+//                        showInformation = ""
+//                    }
                 }
-                if (data.information.action != "Send" && data.information.action != "Receive") {
-                    showInformation = data.description
+                if (data.information.actionType != "Send" && data.information.actionType != "Receive") {
+                    showInformation = data.label
                 }
                 length = showInformation.size
                 (length, showInformation)
@@ -1261,19 +1318,19 @@ object GraphObject {
                 (length, showInformation)
             }
             case "cancel" => {
-                showInformation = ""
+                showInformation = data.label
                 (length, showInformation)
             }
             case "auto" => {
-                showInformation = ""
+                showInformation = data.label
                 (length, showInformation)
             }
-            case "implicit" => {
-                showInformation = ""
+            case "hidden" => {
+                showInformation = data.label
                 (length, showInformation)
             }
-            case "" => {
-                showInformation = ""
+            case _ => {
+                showInformation = s"Edge Type Error: $currentTransitionType"
                 (length, showInformation)
             }
         }
@@ -1289,6 +1346,7 @@ object GraphObject {
         var showDescription = descriptionData(tr)
         var labelLength: Int = showDescription._1
         var actualHeight = false
+//        println(s"label: ${tr.information.relatedMessageType},${tr.information.actionType}, length, content: ${showDescription}")
 
         var offsetLeft = (labelLength * 8) / 2
         <.label(
@@ -1311,7 +1369,7 @@ object GraphObject {
             ^.whiteSpace.nowrap,
             ^.textOverflow.ellipsis,
             ^.lineHeight := 30.px,
-            ^.overflow.hidden,
+            ^.overflow.hidden
         )
     }
 
@@ -1321,16 +1379,17 @@ object GraphObject {
         val y1 = _y1
         val y2 = _y2
         val labelLength = tr.transitionType.length
+        var showDescription = descriptionData(tr)
         val offsetLeft = (labelLength * 8) / 2
         val times = tr.repeatTimes
         var actualHeigth = 0
         if (times <= 1) {
-            actualHeigth = -15
+            actualHeigth = 15
         } else {
             actualHeigth = 15 * (times)
         }
         <.label(
-            tr.transitionType,
+            showDescription._2,
             ^.fontSize := 12.px,
             ^.position.absolute,
             ^.top := actualHeigth.px,
@@ -1353,7 +1412,7 @@ object GraphObject {
         val y2 = _y2
         val w = math.abs(x1 - x2) + gap
         val h = math.abs(y1 - y2)
-
+        var showDescription = descriptionData(tr)
         val labelLength = tr.transitionType.length
         val offsetLeft = (labelLength * 8) / 2
         val times = tr.repeatTimes
@@ -1369,7 +1428,7 @@ object GraphObject {
 
 
         <.label(
-            tr.transitionType,
+            showDescription._2,
             ^.fontSize := 12.px,
             ^.position.absolute,
             ^.top := (actualHeigth).px,
@@ -1390,23 +1449,23 @@ object GraphObject {
         val x2 = _x2
         val y1 = _y1
         val y2 = _y2
-        var labelLength = tr.transitionType.length
+        var labelLength = tr.label.length
         var offsetLeft = (labelLength * 8) / 2
-
+        var showDescription = descriptionData(tr)
         val times = tr.repeatTimes
-        var actualHeigth = 0
-        if (times <= 1) {
-            actualHeigth = 15
-        } else {
-            actualHeigth = 15 * (times)
-        }
+        var actualHeight = Math.abs(y2 - y1) / 2
+//        if (times <= 1) {
+//            actualHeight = 15
+//        } else {
+//            actualHeight = 15 * (times)
+//        }
 
 
         <.label(
-            tr.transitionType,
+            showDescription._2,
             ^.fontSize := 12.px,
             ^.position.absolute,
-            ^.top := (-actualHeigth).px,
+            ^.top := (-actualHeight).px,
             ^.left := (-offsetLeft).px,
             ^.width := (labelLength * 8).px,
             ^.height := 30.px,
@@ -1428,6 +1487,7 @@ object GraphObject {
         val w = math.abs(x1 - x2) + gap
         val h = math.abs(y1 - y2)
         val labelLength = tr.transitionType.length
+        var showDescription = descriptionData(tr)
         val offsetLeft = (labelLength * 8) / 2
         val times = tr.repeatTimes
         var actualHeigth = 0
@@ -1441,7 +1501,7 @@ object GraphObject {
         }
 
         <.label(
-            tr.transitionType,
+            showDescription._2,
             ^.fontSize := 12.px,
             ^.position.absolute,
             ^.top := (-actualHeigth).px,
@@ -1499,6 +1559,77 @@ object GraphObject {
                 ^.borderTop := "solid 10px black",
                 ^.borderRight := "solid 5px transparent"
             ),
+//            <.div(
+//                ^.position.absolute,
+//                Style.whitespaceStyle,
+//                ^.width := "auto",
+//                ^.height := "auto",
+////                ^.display := "inline-block !important",
+//                ^.display := "inline",
+//                ^.marginTop := 30.px,
+//                ^.marginLeft := (-(tr.description.length * 4)).px,
+//                ^.border := "solid 1px black"
+////                tr.description
+//            ),
+            eventMap(onClickKey)
+        )
+    }
+
+    def drawLeftArrow(_x1: Int, _y1: Int, _x2: Int, _y2: Int, tr: TransitionData, backgroundColor: String, eventMap: Map[String, TagMod]): TagMod = {
+        val x1 = _x1
+        val y1 = _y1
+        val x2 = _x2
+        val y2 = _y2
+        val widthP = Math.abs(x2 - x1)
+        val heightP = Math.abs(y2 - y1)
+
+
+        <.div(
+            ^.position.absolute,
+            ^.width := widthP.px,
+            ^.height := 0.px,
+            ^.top := y1.px,
+            ^.left := x2.px,
+            ^.borderBottom := backgroundColor,
+            <.div(
+                ^.position.absolute,
+                ^.top := (-4.5).px,
+                ^.left := (-0.5).px,
+                ^.width := 0.px,
+                ^.height := 0.px,
+                ^.borderBottom := "solid 5px transparent",
+                ^.borderTop := "solid 5px transparent",
+                ^.borderRight := "solid 10px black"
+            ),
+            eventMap(onClickKey)
+        )
+    }
+
+    def drawRightArrow(_x1: Int, _y1: Int, _x2: Int, _y2: Int, tr: TransitionData, backgroundColor: String, eventMap: Map[String, TagMod]): TagMod = {
+        val x1 = _x1
+        val y1 = _y1
+        val x2 = _x2
+        val y2 = _y2
+        val widthP = Math.abs(x2 - x1)
+        val heightP = Math.abs(y2 - y1)
+
+        <.div(
+            ^.position.absolute,
+            ^.borderBottom := backgroundColor,
+            ^.width := widthP.px,
+            ^.height := 0.px,
+            ^.top := y1.px,
+            ^.left := x1.px,
+            <.div(
+                ^.position.absolute,
+                ^.top := (-4.5).px,
+                ^.left := (widthP - 10).px,
+                ^.width := 0.px,
+                ^.height := 0.px,
+                ^.borderLeft := "solid 10px black",
+                ^.borderTop := "solid 5px transparent",
+                ^.borderBottom := "solid 5px transparent"
+            ),
             eventMap(onClickKey)
         )
     }
@@ -1524,7 +1655,7 @@ object GraphObject {
             gap = 80
             smallGap = 0
         }
-
+        println("transitionLabelOfLeftDown")
         <.div(
             ^.position.absolute,
             ^.width := (widthP + gap).px,
@@ -1555,10 +1686,50 @@ object GraphObject {
                         ^.borderLeft := "solid 10px black",
                         ^.borderTop := "solid 5px transparent",
                         ^.borderBottom := "solid 5px transparent"
-                    ),
+                    )
                 )
             ),
             transitionLabelOfLeftDown(x1, y1, x2, y2, tr),
+            eventMap(onClickKey)
+        )
+    }
+
+    def drawDownLeftArrow(_x1: Int, _y1: Int, _x2: Int, _y2: Int, tr: TransitionData, backgroundColor: String, eventMap: Map[String, TagMod]): TagMod = {
+        val x1 = _x1
+        val y1 = _y1
+        val x2 = _x2
+        val y2 = _y2
+        val widthP = Math.abs(x2 - x1)
+        val heightP = Math.abs(y2 - y1)
+
+
+        <.div(
+            ^.position.absolute,
+            ^.width := 0.px,
+            ^.height := heightP.px,
+            ^.top := y1.px,
+            ^.left := x1.px,
+            ^.borderRight := backgroundColor,
+            transitionLabel(x1, y1, x2, y2, tr, 0.0),
+            <.div(
+                ^.position.absolute,
+                ^.width := widthP.px,
+                ^.height := 0.px,
+                ^.marginTop := heightP.px,
+                ^.marginLeft := (-widthP).px,
+                ^.borderBottom := backgroundColor,
+                <.div(
+                    ^.position.absolute,
+                    ^.top := (-4.5).px,
+                    ^.left := (-0.5).px,
+                    ^.width := 0.px,
+                    ^.height := 0.px,
+                    ^.borderBottom := "solid 5px transparent",
+                    ^.borderTop := "solid 5px transparent",
+                    ^.borderRight := "solid 10px black"
+                )
+
+            ),
             eventMap(onClickKey)
         )
     }
@@ -1571,20 +1742,20 @@ object GraphObject {
         val times = tr.repeatTimes
         val widthP = Math.abs(x2 - x1)
         val heightP = Math.abs(y2 - y1)
-        var gap = 0
+        var gap = 80
         var smallGap = 0
 
-        if (times == 1) {
-            gap = 80
-            smallGap = 0
-        } else if (times > 1) {
-            gap = 60 + times * 40
-            smallGap = times * 4
-        } else {
-            gap = 80
-            smallGap = 0
-        }
-
+//        if (times == 1) {
+//            gap = 80
+//            smallGap = 0
+//        } else if (times > 1) {
+//            gap = 60 + times * 40
+//            smallGap = times * 4
+//        } else {
+//            gap = 80
+//            smallGap = 0
+//        }
+//        println("transitionLabelOfRightDown")
         <.div(
             ^.position.absolute,
             ^.width := (widthP + gap).px,
@@ -1648,7 +1819,6 @@ object GraphObject {
             gap = 60
             smallGap = 0
         }
-
         <.div(
             ^.position.absolute,
             ^.borderBottom := backgroundColor,
@@ -1708,7 +1878,7 @@ object GraphObject {
             gap = 60
             smallGap = 0
         }
-
+        println("transitionLabelOfRightTop")
         <.div(
             ^.position.absolute,
             ^.borderBottom := backgroundColor,
@@ -2073,7 +2243,6 @@ object GraphObject {
 
     def createGraph(sType: String, stateData: StateData, processID: String, subjectID: String): StateGraph ={
         var graph: StateGraph = null
-        println(s"state type: $sType")
         sType match{
             case "Action" => {
                 graph = new Action(processID, subjectID, stateData)
@@ -2084,10 +2253,10 @@ object GraphObject {
             case "Receive" => {
                 graph = new Receive(processID, subjectID, stateData)
             }
-            case "Modal Join" => {
+            case "ModalJoin" => {
                 graph = new ModalJoin(processID, subjectID, stateData)
             }
-            case "Modal Split" => {
+            case "ModalSplit" => {
                 graph = new ModalSplit(processID, subjectID, stateData)
             }
             case "Tau" => {
@@ -2122,6 +2291,9 @@ object GraphObject {
             }
             case "End" => {
                 graph = new End(processID, subjectID, stateData)
+            }
+            case _ =>{
+                println(s"state type error: $sType")
             }
         }
         graph

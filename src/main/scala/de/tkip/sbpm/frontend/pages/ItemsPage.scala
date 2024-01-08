@@ -15,7 +15,7 @@ object ItemsPage {
 
         import dsl._
 
-        val container = style(display.flex, width :=! "100%", height(600.px), borderTop :=! "1px solid rgb(223, 220, 200)") // body of item
+        val container = style(display.flex, width :=! "100%", height :=! "88vh" , borderTop :=! "1px solid rgb(223, 220, 200)") // body of item
 
         val nav =
             style(width :=! "15%", borderRight :=! "1px solid rgb(223, 220, 200)", backgroundColor :=! c"#E6E6E6") // LeftNav Setting

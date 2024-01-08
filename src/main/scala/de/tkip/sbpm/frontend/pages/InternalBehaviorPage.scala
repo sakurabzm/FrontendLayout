@@ -1,36 +1,23 @@
 package de.tkip.sbpm.frontend.pages
 
-
-import com.sun.org.apache.xml.internal.security.algorithms.MessageDigestAlgorithm
 import de.tkip.sbpm.frontend.graph.{Graph, GraphObject, StateGraph}
 import scalacss.Defaults._
 import scalacss.ScalaCssReact._
 import japgolly.scalajs.react.{Callback, _}
-import japgolly.scalajs.react.extra.router.RouterCtl
 import japgolly.scalajs.react.vdom.html_<^.{^, _}
 import org.scalajs.dom
-import org.scalajs.dom.{WebSocket, MessageEvent, Event, CloseEvent}
-import de.tkip.sbpm.frontend.AppRouter.BehaviorPage
+import de.tkip.sbpm.frontend.AppRouter.{AppPage, BehaviorPage}
 import de.tkip.sbpm.frontend.Data._
 import de.tkip.sbpm.frontend.LayoutAlgorithm._
-import de.tkip.sbpm.frontend.graph.GraphObject.{Arrow, Receive, Send}
+import de.tkip.sbpm.frontend.graph.GraphObject.Arrow
 import de.tkip.sbpm.frontend.components._
+import japgolly.scalajs.react.extra.router.RouterCtl
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Set
-import scala.scalajs.js
-import org.scalajs.dom.raw.{FileReader, HTMLImageElement, UIEvent}
-import io.circe._
-import io.circe.generic.auto._
-import io.circe.generic.semiauto.deriveEncoder
-import io.circe.parser._
-import io.circe.syntax._
-import io.circe.Json
-import de.tkip.sbpm.frontend.pages.SubjectsV.Backend
 
-import scala.scalajs.js.JSON
 
 object InternalBehaviorPage {
 
@@ -52,6 +39,16 @@ object InternalBehaviorPage {
             border :=! "none",
             borderRadius :=! "5px 5px 5px 5px",
             width :=! 60.px,
+            height :=! 30.px,
+            marginTop :=! 10.px,
+            marginLeft :=! 20.px,
+            &.hover(backgroundColor :=! "#4682B4")
+        )
+
+        val buttonStyle2 = style(
+            border :=! "none",
+            borderRadius :=! "5px 5px 5px 5px",
+            width :=! 90.px,
             height :=! 30.px,
             marginTop :=! 10.px,
             marginLeft :=! 20.px,
@@ -80,13 +77,14 @@ object InternalBehaviorPage {
     case class State(statesList: ListBuffer[StateGraph])
 
     var stateIndex = "Action"
-    var isSelected: Graph = null
-    var preState: StateGraph = null
+    var preSelected: Graph = null
+    var preState, virtualStart: StateGraph = null
     var switch = true
 
     var originalStateData: (Int, Boolean, RestoredData) = null
     val bodyH = dom.window.innerHeight
     val bodyW = dom.window.innerWidth
+    val maxNameLength = 18
     var defaultStateList = new ArrayBuffer[StateGraph]()
     //  lazy val stateMap: Map[Int, StateGraph] = ProcessList.processMap(processID).subjectMap(subjectID).stateMap
     //  lazy val arrowMap: Map[Int, Arrow] = ProcessList.processMap(processID).subjectMap(subjectID).arrowMap
@@ -101,15 +99,16 @@ object InternalBehaviorPage {
     var currentStartNode: ListBuffer[Int] = ListBuffer()
     var sendingMessage: Map[Int, Map[Int, Set[String]]] = Map()
     var receivingMessage: Map[Int, Map[Int, Set[String]]] = Map()
-
+    val determineTransitionSet, leavesVisitedSet, nonleavesVisitedSet: Set[Int] = Set()
     var zoomRate = 0.05 //每次放缩比例增量
     var maxRate = 1.0 //最大放大倍数
     var minRate = 0.6 //最小缩小倍数
     var currZoom = 1.0 //当前缩放比
+    val mu = 5
     var isManual = false
     var lockStates: Map[Int, (Int, Int)] = Map()
     val draggingState: Map[Int, ListBuffer[Int]] = Map() // 当前的和之前的
-
+    var multistart = false
     var autoLayout = false
 
     class Backend(val $: BackendScope[Unit, State]) {
@@ -121,7 +120,6 @@ object InternalBehaviorPage {
         def render(s: State) = {
             if (currentCallMacroID > 0) {
                 statesList = ProcessManager.processMap(processID).subjectMap(subjectID).callMacroMap(currentCallMacroID)
-                dom.console.info("aaaaaaaaaaaa  " + currentCallMacroID + "bbbbbbbbb  " + statesList)
             } else {
                 statesList = ProcessManager.processMap(processID).subjectMap(subjectID).stateList
                 stateMap = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap
@@ -167,8 +165,8 @@ object InternalBehaviorPage {
                     <.option("Action"),
                     <.option("Send"),
                     <.option("Receive"),
-                    <.option("Modal Join"),
-                    <.option("Modal Split"),
+                    <.option("ModalJoin"),
+                    <.option("ModalSplit"),
                     <.option("Tau"),
                     <.option("CloseIP"),
                     <.option("OpenIP"),
@@ -192,15 +190,6 @@ object InternalBehaviorPage {
                     "Delete",
                     ^.onClick --> deleteEvent
                 ),
-                <.select(
-                    ^.width := 150.px,
-                    ^.height := 30.px,
-                    ^.marginTop := 10.px,
-                    ^.marginLeft := 20.px,
-                    <.option("Please select layout"),
-                    <.option("from left to right"),
-                    <.option("from top to bottom")
-                ),
                 <.button(
                     Style.buttonStyle,
                     "Clear",
@@ -222,7 +211,7 @@ object InternalBehaviorPage {
                     ^.marginLeft := 20.px,
                     "Lock"
                 ),
-                lockStatePosition(),
+                lockStatePosition,
                 <.button(
                     Style.buttonStyle,
                     "+",
@@ -233,21 +222,27 @@ object InternalBehaviorPage {
                     "-",
                     ^.onClick --> zoomout
                 ),
-                <.button(
-                    Style.buttonStyle,
-                    "Save",
-                    ^.onClick --> saveSubject
-                ),
-                <.button(
-                    Style.buttonStyle,
-                    "Layout",
-                    ^.onClick --> loadSubject
-                ),
                 {
                     SaveButtonComponents.pid = processID
                     SaveButtonComponents.sid = subjectID
                     SaveButtonComponents.b = $
                     SaveButtonComponents.SaveButton()
+                },
+                <.button(
+                    Style.buttonStyle2,
+                    "RPSTLayout",
+                    ^.onClick --> rpstLayout
+                ),
+                <.button(
+                    Style.buttonStyle2,
+                    "TreeLayout",
+                    ^.onClick --> treeLayout
+                ),
+                {
+                    ExportButtonComponents.pid = processID
+                    ExportButtonComponents.sid = subjectID
+                    ExportButtonComponents.b = $
+                    ExportButtonComponents.ExportButton()
                 }
 
                 //          "Export",
@@ -271,7 +266,7 @@ object InternalBehaviorPage {
                     ^.position.absolute,
                     ^.width := "100%",
                     ^.backgroundColor := "pink",
-                    ^.transform := s"scale(${currZoom})",
+                    ^.transform := s"scale($currZoom)",
                     statesList.toTagMod { item =>
                         val eventMap: Map[String, TagMod] = Map()
                         eventMap += (GraphObject.onClickKey -> onClickEvent(item))
@@ -285,7 +280,7 @@ object InternalBehaviorPage {
                         val eventMap: Map[String, TagMod] = Map()
                         eventMap += (GraphObject.onClickKey -> onClickEvent(arrow))
                         arrow.content(eventMap)
-                    }
+                        }
                     }
                 ),
                 <.div(
@@ -298,7 +293,7 @@ object InternalBehaviorPage {
                     ^.backgroundColor := "#F5F5F5",
                     ^.border := "dashed 2px #7EA6E0",
                     ^.borderRadius := 10.px,
-                    (^.display.none).when(tipRelatedInformation == ""),
+                    ^.display.none.when(tipRelatedInformation == ""),
                     <.div(
                         ^.position.relative,
                         ^.marginTop := 2.px,
@@ -357,7 +352,7 @@ object InternalBehaviorPage {
                 <.header(
                     "Setting",
                     ^.textAlign.center,
-                    ^.fontSize := 20.px,
+                    ^.fontSize := 20.px
                 ),
                 <.br,
                 <.br,
@@ -377,8 +372,8 @@ object InternalBehaviorPage {
                         <.br,
                         <.br,
                         <.label(
-                            if (isSelected != null && isSelected.isInstanceOf[StateGraph])
-                                isSelected.asInstanceOf[StateGraph].data.id
+                            if (preSelected != null && preSelected.isInstanceOf[StateGraph])
+                                preSelected.asInstanceOf[StateGraph].data.id
                             else "",
                             ^.textAlign.center,
                             ^.display.block,
@@ -400,12 +395,12 @@ object InternalBehaviorPage {
                         <.br,
                         <.input.text(
                             ^.width := "85%",
-                            if ((isSelected != null) && (isSelected.isInstanceOf[StateGraph])) {
-                                ^.value := isSelected.asInstanceOf[StateGraph].data.stateName
+                            if ((preSelected != null) && (preSelected.isInstanceOf[StateGraph])) {
+                                ^.value := preSelected.asInstanceOf[StateGraph].data.stateName
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> changeStateName(isSelected)
+                            ^.onChange ==> changeStateName(preSelected)
                         )
                     ),
                     <.br,
@@ -417,14 +412,14 @@ object InternalBehaviorPage {
                             ^.max := 100,
                             ^.marginLeft := 10.px,
                             ^.width := 35.px,
-                            if ((isSelected != null) && (isSelected.isInstanceOf[StateGraph])) {
+                            if ((preSelected != null) && (preSelected.isInstanceOf[StateGraph])) {
                                 ^.disabled := false
-                                ^.value := isSelected.asInstanceOf[StateGraph].data.priority
+                                ^.value := preSelected.asInstanceOf[StateGraph].data.priority
                             } else {
                                 ^.disabled := true
                                 ^.value := ""
                             },
-                            ^.onChange ==> getPriorityAction(isSelected)
+                            ^.onChange ==> getPriorityAction(preSelected)
                         )
                     ),
                     <.br,
@@ -435,12 +430,12 @@ object InternalBehaviorPage {
                         <.br,
                         <.select(
                             ^.width := "85%",
-                            if (isSelected != null && isSelected.isInstanceOf[Arrow]) {
+                            if (preSelected != null && preSelected.isInstanceOf[Arrow]) {
                                 ^.disabled := false
                             } else ^.disabled := true,
                             <.option("please select agent!"),
                             //currentAgentsList(isSelected),
-                            ^.onChange ==> getAgent(isSelected)
+                            ^.onChange ==> getAgent(preSelected)
                         )
                     ),
                     <.br,
@@ -451,10 +446,10 @@ object InternalBehaviorPage {
                         <.br,
                         <.input(
                             ^.width := "85%",
-                            if (isSelected != null && isSelected.isInstanceOf[Arrow]) {
+                            if (preSelected != null && preSelected.isInstanceOf[Arrow]) {
                                 ^.disabled := false
                             } else ^.disabled := true,
-                            ^.onChange ==> getMoreAgent(isSelected)
+                            ^.onChange ==> getMoreAgent(preSelected)
                         )
                     ),
                     <.br,
@@ -470,17 +465,17 @@ object InternalBehaviorPage {
                         <.br,
                         <.input.text(
                             ^.width := "85%",
-                            if ((isSelected != null) && (isSelected.isInstanceOf[Arrow]) && checkVarMan(isSelected.asInstanceOf[Arrow])) {
+                            if ((preSelected != null) && (preSelected.isInstanceOf[Arrow]) && checkVarMan(preSelected.asInstanceOf[Arrow])) {
                                 ^.disabled := false
                             } else {
                                 ^.disabled := true
                             },
-                            if ((isSelected != null) && (isSelected.isInstanceOf[Arrow]) && checkVarMan(isSelected.asInstanceOf[Arrow])) {
-                                ^.value := isSelected.asInstanceOf[Arrow].data.variableOperation.v1
+                            if ((preSelected != null) && (preSelected.isInstanceOf[Arrow]) && checkVarMan(preSelected.asInstanceOf[Arrow])) {
+                                ^.value := preSelected.asInstanceOf[Arrow].data.variableOperation.v1
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> getVarTypeV1(isSelected)
+                            ^.onChange ==> getVarTypeV1(preSelected)
                         ),
                         <.br,
                         <.br,
@@ -488,66 +483,66 @@ object InternalBehaviorPage {
                         <.br,
                         <.select(
                             ^.width := "85%",
-                            if ((isSelected != null) && (isSelected.isInstanceOf[Arrow]) && checkVarMan(isSelected.asInstanceOf[Arrow])) {
+                            if ((preSelected != null) && (preSelected.isInstanceOf[Arrow]) && checkVarMan(preSelected.asInstanceOf[Arrow])) {
                                 ^.disabled := false
                             } else {
                                 ^.disabled := true
                             },
                             <.option("clear",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "clear")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "clear")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("Assign",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Assign")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Assign")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("Concatenation",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Concatenation")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Concatenation")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("Intersection",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Intersection")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Intersection")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("Difference",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Difference")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Difference")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("Selection",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Selection")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "Selection")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("ExtractContent",
-                                if ((isSelected != null) &&
-                                        isSelected.isInstanceOf[Arrow] &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "ExtracContent")) {
+                                if ((preSelected != null) &&
+                                        preSelected.isInstanceOf[Arrow] &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "ExtracContent")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("ExtractChannel",
-                                if ((isSelected != null) &&
-                                        isSelected.isInstanceOf[Arrow] &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "ExtractChannel")) {
+                                if ((preSelected != null) &&
+                                        preSelected.isInstanceOf[Arrow] &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "ExtractChannel")) {
                                     ^.selected := true
                                 } else ^.selected := false),
                             <.option("ExtractCorrelationID",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.variableOperation.operation == "ExtractCorrelationID")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.variableOperation.operation == "ExtractCorrelationID")) {
                                     ^.selected := true
                                 } else ^.selected := false),
-                            ^.onChange ==> getVarOperation(isSelected)
+                            ^.onChange ==> getVarOperation(preSelected)
                         ),
                         <.br,
                         <.br,
@@ -555,18 +550,18 @@ object InternalBehaviorPage {
                         <.br,
                         <.input.text(
                             ^.width := "85%",
-                            if ((isSelected != null) && (isSelected.isInstanceOf[Arrow]) && checkVarMan(isSelected.asInstanceOf[Arrow])) {
+                            if ((preSelected != null) && (preSelected.isInstanceOf[Arrow]) && checkVarMan(preSelected.asInstanceOf[Arrow])) {
                                 ^.disabled := false
                             } else {
                                 ^.disabled := true
                             },
-                            if ((isSelected != null) &&
-                                    (isSelected.isInstanceOf[Arrow]) && checkVarMan(isSelected.asInstanceOf[Arrow])) {
-                                ^.value := isSelected.asInstanceOf[Arrow].data.variableOperation.v2
+                            if ((preSelected != null) &&
+                                    (preSelected.isInstanceOf[Arrow]) && checkVarMan(preSelected.asInstanceOf[Arrow])) {
+                                ^.value := preSelected.asInstanceOf[Arrow].data.variableOperation.v2
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> getVarTypeV2(isSelected)
+                            ^.onChange ==> getVarTypeV2(preSelected)
                         ),
                         <.br,
                         <.br,
@@ -574,21 +569,21 @@ object InternalBehaviorPage {
                         <.br,
                         <.input.text(
                             ^.width := "85%",
-                            if ((isSelected != null) &&
-                                    (isSelected.isInstanceOf[Arrow]) &&
-                                    checkVarMan(isSelected.asInstanceOf[Arrow])) {
+                            if ((preSelected != null) &&
+                                    (preSelected.isInstanceOf[Arrow]) &&
+                                    checkVarMan(preSelected.asInstanceOf[Arrow])) {
                                 ^.disabled := false
                             } else {
                                 ^.disabled := true
                             },
-                            if ((isSelected != null) &&
-                                    isSelected.isInstanceOf[Arrow] &&
-                                    checkVarMan(isSelected.asInstanceOf[Arrow])) {
-                                ^.value := isSelected.asInstanceOf[Arrow].data.variableOperation.result
+                            if ((preSelected != null) &&
+                                    preSelected.isInstanceOf[Arrow] &&
+                                    checkVarMan(preSelected.asInstanceOf[Arrow])) {
+                                ^.value := preSelected.asInstanceOf[Arrow].data.variableOperation.result
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> getTarget(isSelected)
+                            ^.onChange ==> getTarget(preSelected)
                         )
                     ),
                     <.br,
@@ -599,76 +594,108 @@ object InternalBehaviorPage {
                             ^.fontWeight.bold,
                             ^.fontSize := 14.px
                         ),
-                        <.br,
                         "Type: ",
                         <.select(
                             ^.width := 82.px,
                             ^.marginLeft := 20.px,
-                            <.option("", // todo transition的类型还没有定义
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.transitionType == "")) {
-                                    ^.selected := true
-                                } else {
-                                    ^.selected := false
-                                }),
                             <.option("normal",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.transitionType == "normal")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.transitionType == "normal")) {
                                     ^.selected := true
                                 } else {
                                     ^.selected := false
                                 }),
-                            <.option("implicit",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.transitionType == "implicit")) {
+                            <.option("hidden",
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.transitionType == "hidden")) {
                                     ^.selected := true
                                 } else {
                                     ^.selected := false
                                 }),
                             <.option("timeout",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.transitionType == "timeout")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.transitionType == "timeout")) {
                                     ^.selected := true
                                 } else {
                                     ^.selected := false
                                 }),
                             <.option("auto",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.transitionType == "auto")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.transitionType == "auto")) {
                                     ^.selected := true
                                 } else {
                                     ^.selected := false
                                 }),
                             <.option("cancel",
-                                if ((isSelected != null) &&
-                                        (isSelected.isInstanceOf[Arrow]) &&
-                                        (isSelected.asInstanceOf[Arrow].data.transitionType == "cancel")) {
+                                if ((preSelected != null) &&
+                                        (preSelected.isInstanceOf[Arrow]) &&
+                                        (preSelected.asInstanceOf[Arrow].data.transitionType == "cancel")) {
                                     ^.selected := true
                                 } else {
                                     ^.selected := false
                                 }),
-                            ^.onChange ==> getTransitionType(isSelected)
+                            ^.onChange ==> getTransitionType(preSelected)
                         ),
                         <.br,
                         <.br,
+                        <.li(
+                            "Multi Transitions: ",
+                            <.button(
+                                ^.borderRadius := "5px 5px 5px 5px",
+                                ^.width := 40.px,
+                                ^.height := 20.px,
+                                ^.marginTop := 10.px,
+                                "Add",
+                                ^.cursor.pointer,
+                                if (preSelected != null && preSelected.isInstanceOf[Arrow] && checkMessageState(preSelected.asInstanceOf[Arrow])) {
+                                    ^.disabled := false
+                                } else ^.disabled := true,
+                                ^.onClick --> addMultiTransitions
+                            ),
+                            <.button(
+                                ^.borderRadius := "5px 5px 5px 5px",
+                                ^.width := 40.px,
+                                ^.height := 20.px,
+                                ^.marginTop := 10.px,
+                                "Del",
+                                ^.cursor.pointer,
+                                if (preSelected != null && preSelected.isInstanceOf[Arrow] && checkMessageState(preSelected.asInstanceOf[Arrow])) {
+                                    ^.disabled := false
+                                } else ^.disabled := true,
+                                ^.onClick --> delMultiTransitions(preSelected)
+                            ),
+                            <.br,
+                            "List of Transitions: ",
+                            <.select(
+                                ^.width := 40.px,
+                                if (preSelected != null && preSelected.isInstanceOf[Arrow] && checkMessageState(preSelected.asInstanceOf[Arrow])) {
+                                    ^.disabled := false
+                                } else ^.disabled := true,
+                                multiTransionsList,
+                                ^.onChange ==> getSelectTransition(preSelected)
+                            )
+                        ),
+                        <.br,
                         <.br,
                         <.li(
-                            "Message Type : ", // transition with communication message
+                            "Message Type: ", // transition with communication message
                             <.br,
                             <.br,
                             <.select(
                                 ^.width := "85%",
-                                if (isSelected != null && isSelected.isInstanceOf[Arrow] && checkMessageState(isSelected.asInstanceOf[Arrow])) {
+                                if (preSelected != null && preSelected.isInstanceOf[Arrow] && checkMessageState(preSelected.asInstanceOf[Arrow])) {
                                     ^.disabled := false
                                 } else ^.disabled := true,
-                                <.option("select message type!"),
-                                transitionMsgT(),
-                                ^.onChange ==> getMessageTypeOfTransition(isSelected)
+                                <.option(
+                                    "select message type.",
+                                    ^.selected := true
+                                ),
+                                transitionMsgT,
+                                ^.onChange ==> getMessageTypeOfTransition(preSelected)
                             )
                         ),
                         <.br,
@@ -680,10 +707,10 @@ object InternalBehaviorPage {
                             <.input.text(
                                 ^.id := "createMsg",
                                 ^.width := "85%",
-                                if (isSelected != null && (isSelected.isInstanceOf[Arrow]) && checkCommunicationState(isSelected.asInstanceOf[Arrow])) {
+                                if (preSelected != null && (preSelected.isInstanceOf[Arrow]) && checkCommunicationState(preSelected.asInstanceOf[Arrow])) {
                                     ^.disabled := false
                                 } else ^.disabled := true,
-                                ^.onChange ==> createNewMessageType(isSelected)
+                                ^.onChange ==> createNewMessageType(preSelected)
                             )
                         ),
                         <.br,
@@ -694,12 +721,12 @@ object InternalBehaviorPage {
                             <.br,
                             <.select(
                                 ^.width := "85%",
-                                if (isSelected != null && isSelected.isInstanceOf[Arrow] && checkMessageState(isSelected.asInstanceOf[Arrow])) {
+                                if (preSelected != null && preSelected.isInstanceOf[Arrow] && checkMessageState(preSelected.asInstanceOf[Arrow])) {
                                     ^.disabled := false
                                 } else ^.disabled := true,
                                 <.option("select related subject!"),
-                                transitionRelatedS(), // transition
-                                ^.onChange ==> getRelatedSubjectNameOfTransition(isSelected)
+                                transitionRelatedS, // transition
+                                ^.onChange ==> getRelatedSubjectNameOfTransition(preSelected)
                             )
 
                         ),
@@ -710,12 +737,12 @@ object InternalBehaviorPage {
                             ^.width := 80.px,
                             ^.marginLeft := 20.px,
                             ^.min := 0,
-                            if ((isSelected != null) && (isSelected.isInstanceOf[Arrow])) {
-                                ^.value := isSelected.asInstanceOf[Arrow].data.timeout
+                            if ((preSelected != null) && (preSelected.isInstanceOf[Arrow])) {
+                                ^.value := preSelected.asInstanceOf[Arrow].data.timeout
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> getTransitionTimeout(isSelected)
+                            ^.onChange ==> getTransitionTimeout(preSelected)
                         ),
                         "s",
                         <.br,
@@ -724,12 +751,12 @@ object InternalBehaviorPage {
                         <.br,
                         <.input.number(
                             ^.min := 0,
-                            if ((isSelected != null) && (isSelected.isInstanceOf[Arrow])) {
-                                ^.value := isSelected.asInstanceOf[Arrow].data.priority
+                            if ((preSelected != null) && (preSelected.isInstanceOf[Arrow])) {
+                                ^.value := preSelected.asInstanceOf[Arrow].data.priority
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> getPriorityTransition(isSelected)
+                            ^.onChange ==> getPriorityTransition(preSelected)
                         )
                     ),
                     <.br,
@@ -740,18 +767,18 @@ object InternalBehaviorPage {
                         <.br,
                         <.input(
                             ^.width := "85%",
-                            if (isSelected != null && (isSelected.isInstanceOf[Arrow])) {
-                                ^.value := isSelected.asInstanceOf[Arrow].data.activatedStateID
+                            if (preSelected != null && (preSelected.isInstanceOf[Arrow])) {
+                                ^.value := preSelected.asInstanceOf[Arrow].data.activatedStateID
                             } else {
                                 ^.value := ""
                             },
-                            ^.onChange ==> getActivatedStateID(isSelected)
+                            ^.onChange ==> getActivatedStateID(preSelected)
                         )
                     ),
                     <.br,
                     <.br,
                     <.li(
-                        "Description : ",
+                        "Label : ",
                         <.br,
                         <.br,
                         <.textarea(
@@ -759,11 +786,11 @@ object InternalBehaviorPage {
                             ^.minHeight := 70.px,
                             ^.maxWidth := 140.px,
                             ^.minWidth := 140.px,
-                            if (isSelected != null) {
-                                if (isSelected.isInstanceOf[StateGraph]) ^.value := isSelected.asInstanceOf[StateGraph].data.description
-                                else ^.value := isSelected.asInstanceOf[Arrow].data.description
+                            if (preSelected != null) {
+                                if (preSelected.isInstanceOf[StateGraph]) ^.value := preSelected.asInstanceOf[StateGraph].data.description
+                                else ^.value := preSelected.asInstanceOf[Arrow].data.label
                             } else ^.value := "",
-                            ^.onChange ==> changeDescription(isSelected)
+                            ^.onChange ==> changeDescription(preSelected)
                         )
                     ),
                     <.br,
@@ -774,61 +801,61 @@ object InternalBehaviorPage {
                         <.button(
                             Style.buttonSt,
                             "update",
-                            ^.onClick --> updateEvent(isSelected)))
+                            ^.onClick --> updateEvent(preSelected)))
                 )
             )
         }
 
         def optionOfSelect: TagMod = {
             <.select(
-                if (isSelected.isInstanceOf[StateGraph]) ^.disabled := false
+                if (preSelected.isInstanceOf[StateGraph]) ^.disabled := false
                 else ^.disabled := true,
                 <.option(
                     "Action",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Action"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "Action"))),
                 <.option(
                     "Send",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Send"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "Send"))),
                 <.option(
                     "Receive",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Receive"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "Receive"))),
                 <.option(
-                    "Modal Join",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Modal Join"))),
+                    "ModalJoin",
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "ModalJoin"))),
                 <.option(
-                    "Modal Split",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Modal Split"))),
+                    "ModalSplit",
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "ModalSplit"))),
                 <.option(
                     "Tau",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Tau"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "Tau"))),
                 <.option(
                     "CloseIP",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "CloseIP"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "CloseIP"))),
                 <.option(
                     "OpenIP",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "OpenIP"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "OpenIP"))),
                 <.option(
                     "IsIPEmpty",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "IsIPEmpty"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "IsIPEmpty"))),
                 <.option(
                     "CloseAllIPs",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "CloseAllIPs"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "CloseAllIPs"))),
                 <.option(
                     "OpenAllIPs",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "OpenAllIPs"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "OpenAllIPs"))),
                 <.option(
                     "SelectAgents",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "SelectAgents"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "SelectAgents"))),
                 <.option(
                     "CallMacro",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "CallMacro"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "CallMacro"))),
                 <.option(
                     "VarMan",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "VarMan"))),
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "VarMan"))),
                 <.option(
                     "Cancel",
-                    (^.selected := true).when((isSelected != null) && (!isSelected.isInstanceOf[Arrow]) && (isSelected.asInstanceOf[StateGraph].data.stateType == "Cancel"))),
-                ^.onChange ==> changeStateType(isSelected)
+                    (^.selected := true).when((preSelected != null) && (!preSelected.isInstanceOf[Arrow]) && (preSelected.asInstanceOf[StateGraph].data.stateType == "Cancel"))),
+                ^.onChange ==> changeStateType(preSelected)
             )
         }
 
@@ -868,17 +895,17 @@ object InternalBehaviorPage {
             stateIndex = "Action"
             preState = null
 
-            if (isSelected != null) {
-                if (isSelected.isInstanceOf[Arrow]) {
-                    restoreTransitionData(isSelected.asInstanceOf[Arrow])
+            if (preSelected != null) {
+                if (preSelected.isInstanceOf[Arrow]) {
+                    restoreTransitionData(preSelected.asInstanceOf[Arrow])
                     originalTransitionData = null
-                    isSelected.asInstanceOf[Arrow].resetColor
+                    preSelected.asInstanceOf[Arrow].resetColor
                 } else {
-                    restoreStateData(isSelected.asInstanceOf[StateGraph])
+                    restoreStateData(preSelected.asInstanceOf[StateGraph])
                     originalStateData = null
-                    isSelected.asInstanceOf[StateGraph].resetBorder
+                    preSelected.asInstanceOf[StateGraph].resetBorder
                 }
-                isSelected = null
+                preSelected = null
             } else {
                 originalTransitionData = null
                 originalStateData = null
@@ -899,7 +926,7 @@ object InternalBehaviorPage {
             for (i <- defaultStateList.indices) {
                 if (defaultStateList(i) == null) {
                     defaultStateList(i) = initialS
-                    initialS.setCoordinate(10, i * 30)
+                    initialS.setCoordinate(10, i * 100)
                     isFull = false
                 }
             }
@@ -937,7 +964,42 @@ object InternalBehaviorPage {
             newTransitionId
         }
 
+        def delMultiTransitions(s:Graph): Callback ={
+            val td = s.asInstanceOf[Arrow].data
+            val state = stateMap(td.source)
+            if(state.childrenList.contains(td.target)){
+                state.data.removeDirectChildrenTransition(td)
+            }else if(state.descendantList.contains(td.target)){
+                state.data.removeNonDirectChildrenTransition(td)
+            }
+            $.modState(s => s)
+        }
+
+        def addMultiTransitions: Callback ={
+            if (preSelected != null && preSelected.isInstanceOf[Arrow]) {
+                val td = preSelected.asInstanceOf[Arrow].data
+                td.setMultiTransitions(true)
+                val newTransitionData = new TransitionData(getTransitionId(), td.source, td.target)
+                newTransitionData.setMultiTransitions(true)
+                if(stateMap(td.source).childrenList.contains(td.target)){
+                    stateMap(td.source).data.addDirectChildrenTransition(newTransitionData)
+                }else if(stateMap(td.source).descendantList.contains(td.target)){
+                    stateMap(td.source).data.addNonDirectChildrenTransition(newTransitionData)
+                }
+            }
+            $.modState(s => s)
+        }
+
+        def initStates: Unit = {
+            preState = null
+            preSelected = null
+            originalStateData = null
+            originalTransitionData = null
+        }
+
         def clearStates: Callback = {
+            newStateId = 0
+            newTransitionId = 0
             statesList.clear()
             currentStartNode.clear()
             stateMap.clear()
@@ -945,7 +1007,7 @@ object InternalBehaviorPage {
             defaultStateList.clear()
             leavesList.clear()
             preState = null
-            isSelected = null
+            preSelected = null
             existStart = false
             originalStateData = null
             originalTransitionData = null
@@ -954,12 +1016,12 @@ object InternalBehaviorPage {
         }
 
         def deleteEvent: Callback = {
-            if (isSelected != null) {
-                if (isSelected.isInstanceOf[StateGraph]) { // Delete State
-                    if (!isSelected.asInstanceOf[StateGraph].data.isStartState) {
+            if (preSelected != null) {
+                if (preSelected.isInstanceOf[StateGraph]) { // Delete State
+                    if (!preSelected.asInstanceOf[StateGraph].data.isStartState) {
                         // delete all data from other states
-                        statesList -= isSelected.asInstanceOf[StateGraph]
-                        val deleteObject = isSelected.asInstanceOf[StateGraph]
+                        statesList -= preSelected.asInstanceOf[StateGraph]
+                        val deleteObject = preSelected.asInstanceOf[StateGraph]
                         stateMap.remove(deleteObject.data.ID)
 
                         deleteObject.arrowsToTarget.foreach(id => {
@@ -980,26 +1042,27 @@ object InternalBehaviorPage {
                             }
                             source.arrowsToTarget -= id
                             // 分别从直接子节点列表和非直接子节点列表中删除
-                            source.data.directChildrenTransitionsList.foreach(t => {
-                                if (t.id == id) {
-                                    source.data.removeDirectChildrenTransition(t)
+                            val td = arrowMap(id).data
+                            source.data.directChildrenTransitionsMap.foreach(t => {
+                                if (t._2.contains(td)) {
+                                    source.data.removeDirectChildrenTransition(td)
                                 }
                             })
-                            source.data.nonDirectChildrenTransitionsList.foreach(t => {
-                                if (t.id == id) {
-                                    source.data.removeNonDirectChildrenTransition(t)
+                            source.data.nonDirectChildrenTransitionsMap.foreach(t => {
+                                if (t._2.contains(td)) {
+                                    source.data.removeNonDirectChildrenTransition(td)
                                 }
                             })
                         })
                         if (preState == deleteObject) {
                             preState = null
                         }
-                        isSelected = null
+                        preSelected = null
                         val layout = checkIsolatedNode
                         if (layout) {
-                            if (currentStartNode.size > 1) {
-                                newDummyNode
-                            }
+//                            if (currentStartNode.size > 1) {
+//                                newDummyNode
+//                            }
                             treeLayout(findRootNode)
                         }
                         $.modState(s => State(statesList))
@@ -1007,17 +1070,17 @@ object InternalBehaviorPage {
                         Callback.alert("The current state is StartState")
                     }
                 } else { // Delete transition
-                    val aim = isSelected.asInstanceOf[Arrow]
+                    val aim = preSelected.asInstanceOf[Arrow]
                     val trData = TransitionData(aim.data.id, aim.data.source, aim.data.target)
                     val sid = aim.data.source
                     val tid = aim.data.target
                     val sourceNode = stateMap(sid)
                     val targetNode = stateMap(tid)
                     sourceNode.arrowsToTarget -= aim.data.ID
-                    if (sourceNode.data.directChildrenTransitionsList.contains(trData)) {
+                    if (sourceNode.data.directChildrenTransitionsMap(tid).contains(trData)) {
                         sourceNode.data.removeDirectChildrenTransition(trData)
                     }
-                    if (sourceNode.data.nonDirectChildrenTransitionsList.contains(trData)) {
+                    if (sourceNode.data.nonDirectChildrenTransitionsMap(tid).contains(trData)) {
                         sourceNode.data.removeNonDirectChildrenTransition(trData)
                     }
                     targetNode.arrowsFromSource -= aim.data.ID
@@ -1029,13 +1092,13 @@ object InternalBehaviorPage {
                     }
                     val isLayout = checkIsolatedNode
                     if (isLayout) {
-                        if (currentStartNode.size > 1) {
-                            newDummyNode
-                        }
+//                        if (currentStartNode.size > 1) {
+//                            newDummyNode
+//                        }
                         treeLayout(findRootNode)
                     }
                     arrowMap -= aim.data.id
-                    isSelected = null
+                    preSelected = null
                     $.modState(s => State(statesList))
                 }
             } else Callback()
@@ -1053,12 +1116,12 @@ object InternalBehaviorPage {
                 }
             }
             for (node <- suspiciousNode) {
-                if (!node.arrowsFromSource.isEmpty) {
+                if (node.arrowsFromSource.nonEmpty) {
                     isolatedNodeList -= node.data.id
                 }
             }
             //TODO 把孤立节点作为假起点加入currentStartState
-            if (isolatedNodeList.size == 0) {
+            if (isolatedNodeList.isEmpty) {
                 layout = true
             } else {
                 isolatedNodeList.foreach(node => {
@@ -1072,10 +1135,10 @@ object InternalBehaviorPage {
             layout
         }
 
-        def lockStatePosition() = {
-            if ((isSelected != null) && (isSelected.isInstanceOf[StateGraph])) {
+        def lockStatePosition: TagMod= {
+            if ((preSelected != null) && (preSelected.isInstanceOf[StateGraph])) {
                 <.input.checkbox(
-                    ^.checked := isSelected.asInstanceOf[StateGraph].lock,
+                    ^.checked := preSelected.asInstanceOf[StateGraph].lock,
                     ^.onChange --> changeLockState
                 )
             } else {
@@ -1086,24 +1149,26 @@ object InternalBehaviorPage {
         }
 
         def changeLockState: Callback = {
-            if ((isSelected.asInstanceOf[StateGraph].lock)) {
-                isSelected.asInstanceOf[StateGraph].lock = false
-                isSelected.asInstanceOf[StateGraph].resetBackgroundColor
-                lockStates.remove(isSelected.asInstanceOf[StateGraph].data.id)
+            if ((preSelected.asInstanceOf[StateGraph].lock)) {
+                preSelected.asInstanceOf[StateGraph].lock = false
+                preSelected.asInstanceOf[StateGraph].resetBackgroundColor
+                preSelected.asInstanceOf[StateGraph].resetBackgroundColor
+                lockStates.remove(preSelected.asInstanceOf[StateGraph].data.id)
             } else {
-                isSelected.asInstanceOf[StateGraph].lock = true
-                val currentCoordinateX = isSelected.asInstanceOf[StateGraph].sx
-                val currentCoordinateY = isSelected.asInstanceOf[StateGraph].sy
-                lockStates += isSelected.asInstanceOf[StateGraph].data.id -> (currentCoordinateX, currentCoordinateY)
-                isSelected.asInstanceOf[StateGraph].changeBackgroundColor
+                preSelected.asInstanceOf[StateGraph].lock = true
+                preSelected.asInstanceOf[StateGraph].isolatedNodeColor
+                val currentCoordinateX = preSelected.asInstanceOf[StateGraph].sx
+                val currentCoordinateY = preSelected.asInstanceOf[StateGraph].sy
+                lockStates += preSelected.asInstanceOf[StateGraph].data.id -> (currentCoordinateX, currentCoordinateY)
+                preSelected.asInstanceOf[StateGraph].changeBackgroundColor
             }
             $.modState(s => s)
         }
 
         def startStateCheckbox() = {
-            if ((isSelected != null) && (isSelected.isInstanceOf[StateGraph])) {
+            if ((preSelected != null) && (preSelected.isInstanceOf[StateGraph])) {
                 <.input.checkbox(
-                    ^.checked := isSelected.asInstanceOf[StateGraph].data.isStartState,
+                    ^.checked := preSelected.asInstanceOf[StateGraph].data.isStartState,
                     ^.onChange --> setStartState
                 )
             } else {
@@ -1123,10 +1188,10 @@ object InternalBehaviorPage {
         }
 
         def setStartState: Callback = {
-            if ((isSelected.asInstanceOf[StateGraph].data.isStartState)) {
-                isSelected.asInstanceOf[StateGraph].data.isStartState = false
+            if ((preSelected.asInstanceOf[StateGraph].data.isStartState)) {
+                preSelected.asInstanceOf[StateGraph].data.isStartState = false
             } else {
-                isSelected.asInstanceOf[StateGraph].data.isStartState = true
+                preSelected.asInstanceOf[StateGraph].data.isStartState = true
             }
             $.modState(s => s)
         }
@@ -1175,12 +1240,15 @@ object InternalBehaviorPage {
                 arrowMap(f).changeTargetCoordinate(x + graphCenter._1, y)
                 val preNode = stateMap(arrowMap(f).data.source)
                 val preNodeCenter = getSymbolCenter(preNode)
-                preNode.dragging = true
+//                preNode.dragging = true
                 draggingState(graph.data.id) += preNode.data.id
-                val entireList = preNode.data.directChildrenTransitionsList ++ preNode.data.nonDirectChildrenTransitionsList
+                val entireList: ListBuffer[ListBuffer[TransitionData]] = ListBuffer()
+                entireList ++= preNode.data.directChildrenTransitionsMap.valuesIterator
+                entireList ++= preNode.data.nonDirectChildrenTransitionsMap.valuesIterator
                 if (entireList.size > 1) {
                     for (elem <- entireList) {
-                        arrowMap(elem.id).changeSourceCoordinate(preNode.sx + preNodeCenter._1, preNode.sy + preNodeCenter._2 * 2)
+                        elem.foreach(f => arrowMap(f.id).changeSourceCoordinate(preNode.sx + preNodeCenter._1, preNode.sy + preNodeCenter._2 * 2)
+                        )
                     }
                 }
             })
@@ -1188,12 +1256,10 @@ object InternalBehaviorPage {
                 arrowMap(f).changeSourceCoordinate(x + graphCenter._1, y + graphCenter._2 * 2)
             })
 
-            dom.console.info("move to: " + x, y)
-
             e.preventDefaultCB >> $.modState(s => s)
         }
 
-        def changeStateName(s: Graph)(e: ReactEventFromInput): Callback = { // ok
+        def changeStateName(s: Graph)(e: ReactEventFromInput): Callback = {
             originalStateData = (originalStateData._1, false, originalStateData._3)
             var offset = 0
             val newName = e.target.value
@@ -1202,20 +1268,22 @@ object InternalBehaviorPage {
                 val currentState = s.asInstanceOf[StateGraph]
                 if (currentState.isInstanceOf[GraphObject.Action]) {
                     if (!defaultStateList.contains(currentState)) {
-                        if (newName.length > 8) {
-                            offset = (newName.length - currentState.data.stateName.length) * 5
-                            val x = currentState.sx
-                            val y = currentState.sy
-                            currentState.setCoordinate(x - offset, y)
-                            currentState.graphWidth = currentState.asInstanceOf[GraphObject.Action].changeWidth(newName)
-                        } else {
-                            currentState.graphWidth = 80
-                            val a = currentState.data.stateName.length //原本就大于8
-                            if (a >= 8) {
-                                val newOffset = (a - 8) * 5
+                        if(newName.length <= maxNameLength){
+                            if (newName.length > 8) {
+                                offset = (newName.length - currentState.data.stateName.length) * 5
                                 val x = currentState.sx
                                 val y = currentState.sy
-                                currentState.setCoordinate(x + newOffset, y)
+                                currentState.setCoordinate(x - offset, y)
+                                currentState.graphWidth = currentState.asInstanceOf[GraphObject.Action].changeWidth(newName)
+                            } else {
+                                currentState.graphWidth = 80
+                                val a = currentState.data.stateName.length //原本就大于8
+                                if (a >= 8) {
+                                    val newOffset = (Math.min(a, maxNameLength) - 8) * 5
+                                    val x = currentState.sx
+                                    val y = currentState.sy
+                                    currentState.setCoordinate(x + newOffset, y)
+                                }
                             }
                         }
                     }
@@ -1331,6 +1399,7 @@ object InternalBehaviorPage {
             val specialStateID = -100
             val sd = new StateData(getStateId())
             val dummyState = new GraphObject.DummyNode(processID, subjectID, sd)
+            dummyState.deep = -1
             statesList += dummyState
             stateMap += dummyState.data.id -> dummyState
             currentStartNode.foreach(start => dummyState.childrenList += start)
@@ -1351,65 +1420,75 @@ object InternalBehaviorPage {
         val leavesList: ListBuffer[Int] = ListBuffer()
 
         def findLeaf(currentNode: StateGraph): Unit = {
-            var isTemp = false
-            dom.console.info("我是布局第二步" + currentNode.data.id)
-            val allDescendNodes = (currentNode.childrenList ++ currentNode.descendantList).clone()
-            if (allDescendNodes.isEmpty) {
-                leavesList += currentNode.data.id
-                return
-            }
-            if (currentNode.childrenList.isEmpty && currentNode.descendantList.nonEmpty) {
-                isTemp = true
-            }
-            for (node <- allDescendNodes) {
-                val descendNode = stateMap(node)
-                // 直接子节点
-                if (descendNode.parentID == currentNode.data.id) {
-                    findLeaf(descendNode)
-                }
-                // 非直接子节点，有连接
-                if (descendNode.parentID == -1) {
-                    descendNode.parentID = currentNode.data.id
-                    descendNode.deep = currentNode.deep + 1
-                    currentNode.childrenList += descendNode.data.id
-                    currentNode.descendantList -= descendNode.data.id
-                    descendNode.childrenList.foreach(chl => {
-                        stateMap(chl).deep = descendNode.deep + 1
-                    })
-                    findLeaf(descendNode)
-                }
-            }
-            if (isTemp) {
-                if (currentNode.childrenList.isEmpty) {
+            if(!leavesVisitedSet.contains(currentNode.data.id)){
+                leavesVisitedSet.add(currentNode.data.id)
+                var isTemp = false
+                val allDescendNodes = (currentNode.childrenList ++ currentNode.descendantList).clone()
+                if (allDescendNodes.isEmpty) {
                     leavesList += currentNode.data.id
+                    return
+                }
+                if (currentNode.childrenList.isEmpty && currentNode.descendantList.nonEmpty) {
+                    isTemp = true
+                }
+                for (node <- allDescendNodes) {
+                    val descendNode = stateMap(node)
+                    // 直接子节点
+                    if (descendNode.parentID == currentNode.data.id) {
+                        findLeaf(descendNode)
+                    }
+                    // 非直接子节点，有连接
+                    if (descendNode.parentID == -1 && !currentStartNode.contains(descendNode.data.id)) {
+                        descendNode.parentID = currentNode.data.id
+                        descendNode.deep = currentNode.deep + 1
+                        if(!currentNode.childrenList.contains(descendNode.data.id)){
+                            currentNode.childrenList += descendNode.data.id
+                        }
+                        currentNode.descendantList -= descendNode.data.id
+                        descendNode.childrenList.foreach(chl => {
+                            stateMap(chl).deep = descendNode.deep + 1
+                        })
+                        findLeaf(descendNode)
+                    }
+                }
+                if (isTemp) {
+                    if (currentNode.childrenList.isEmpty) {
+                        leavesList += currentNode.data.id
+                    }
                 }
             }
-
         }
 
         def allocateNonLeavesCoordinate(currentID: Int): Unit = {
-            dom.console.info("我是布局第四步" + currentID)
-            val currentNode = stateMap(currentID)
-            val currentChildrenList = currentNode.childrenList
-            if (!currentNode.sign) {
-                currentChildrenList.foreach(chl => {
-                    allocateNonLeavesCoordinate(chl)
-                })
+            if(!nonleavesVisitedSet.contains(currentID)){
+                nonleavesVisitedSet.add(currentID)
+                val currentNode =
+                    if(currentID == -100)
+                        virtualStart
+                    else
+                        stateMap(currentID)
+                val currentChildrenList = currentNode.childrenList
+                if (!currentNode.sign) {
+                    currentChildrenList.foreach(chl => {
+                        allocateNonLeavesCoordinate(chl)
+                    })
 
-                val firstChild = stateMap(currentNode.childrenList.head).sx
-                val lastChild = stateMap(currentNode.childrenList.last).sx
-                val rootX = (firstChild + lastChild) / 2
-                val rootY = (currentNode.deep + 1) * 150
-                currentNode.setCoordinate(rootX, rootY)
-                currentNode.sign = true
+                    val firstChild = stateMap(currentNode.childrenList.head)
+                    val lastChild = stateMap(currentNode.childrenList.last)
+                    val rootX = (firstChild.sx + getSymbolCenter(firstChild)._1 + lastChild.sx + getSymbolCenter(lastChild)._1) / 2 - getSymbolCenter(currentNode)._1
+                    val rootY = (currentNode.deep + 1) * 150
+                    currentNode.setCoordinate(rootX, rootY)
+                    currentNode.sign = true
+                    println(s"分配节点坐标 id: ${currentNode.data.id}, x: $rootX, y: $rootY")
+                    println(s"子节点 x1: ${firstChild.sx}, x2: ${lastChild.sx}")
+                }
             }
-
         }
 
         def resetAllDataOfState: Unit = {
             statesList.foreach(s => {
                 if (s.isInstanceOf[StateGraph]) {
-                    val action = s.asInstanceOf[StateGraph]
+                    val action = s
                     action.resetAllData
                 }
             })
@@ -1444,23 +1523,26 @@ object InternalBehaviorPage {
         // 树形布局
         def treeLayout(rootID: Int): Unit = {
             if (!autoLayout) {
-                dom.console.info("我是布局第一步")
-                val rootState = stateMap(rootID)
+                val rootState =
+                    if(rootID == -100)
+                        virtualStart
+                    else
+                        stateMap(rootID)
+
                 arrowMap.clear()
+                determineTransitionSet.clear()
+                leavesVisitedSet.clear()
+                nonleavesVisitedSet.clear()
                 resetAllDataOfState
                 leavesList.clear()
                 //      classifyNodes.clear()
                 //      classificationResult.clear()
                 findLeaf(rootState)
-                dom.console.info("叶子节点的坐标 " + leavesList)
-                var blank = 0
-                if (leavesList.size < 5) {
-                    blank = (bodyW / 4).toInt
-                } else {
-                    blank = (bodyW / 6).toInt
+                var blank = (bodyW / 5).toInt
+                if (leavesList.size > 5) {
+                    blank = (bodyW / 8).toInt
                 }
-                dom.console.info("我是布局第三步,为叶子节点分配坐标")
-                val stepX = 150
+                val stepX = 250
                 val stepY = 150
                 for (i <- 0 until leavesList.size) {
                     val leafID = leavesList(i)
@@ -1479,12 +1561,29 @@ object InternalBehaviorPage {
                     statesList -= stateMap(-100)
                     stateMap.remove(-100)
                 }
-                statesList.foreach(s => {
-                    if (s.isInstanceOf[StateGraph]) {
-                        val currentAction = s.asInstanceOf[StateGraph]
-                        determineTransition(currentAction)
+//                statesList.foreach(s => {
+//                    if (s.isInstanceOf[StateGraph]) {
+//                        val currentAction = s
+//                        determineTransition(currentAction)
+//                    }
+//                })
+
+                currentStartNode.foreach(s =>{
+                    determineTransitionRecursion(stateMap(s))
+                    if(!determineTransitionSet.contains(s)){
+                        determineTransition(stateMap(s))
                     }
                 })
+            }
+        }
+
+        def determineTransitionRecursion(s: StateGraph): Unit ={
+            for(c <- s.childrenList){
+                if(!determineTransitionSet.contains(c)){
+                    determineTransitionSet.add(c)
+                    determineTransitionRecursion(stateMap(c))
+                    determineTransition(stateMap(c))
+                }
             }
         }
 
@@ -1494,98 +1593,100 @@ object InternalBehaviorPage {
         val noneTransition = "End"
         var tipRelatedInformation = ""
 
-        def tipInformation(source: StateGraph, edgeData: TransitionData): (Boolean, Int) = {
-            val sourceStateType = source.data.stateType
-            var isUpdated = false
-            var num = 0
-            // 只有一条边
-            if (onlyOneTransition.contains(sourceStateType)) {
-                val allTransitions = source.data.directChildrenTransitionsList ++ source.data.nonDirectChildrenTransitionsList
-                //allTransitions -= edgeData
-                allTransitions.foreach(edge => {
-                    if (edge.transitionType == "normal") {
-                        num += 1
-                    }
-                })
-                if (num >= 2) {
-                    isUpdated = false
-                } else {
-                    isUpdated = true
-                }
-            }
-            // 只有两条边
-            if (onlyTwoTransitions == sourceStateType) {
-                val allTransitions = source.data.directChildrenTransitionsList ++ source.data.nonDirectChildrenTransitionsList
-                //allTransitions -= edgeData
-                allTransitions.foreach(edge => {
-                    if (edge.transitionType == "normal") {
-                        num += 1
-                    }
-                })
-                if (num <= 2) {
-                    isUpdated = true
-                } else {
-                    isUpdated = false
-                }
-            }
-
-            // 多条边
-            if (multipleTransition.contains(sourceStateType)) {
-                isUpdated = true
-                num = 0
-            }
-            (isUpdated, num)
-        }
+//        def tipInformation(source: StateGraph, edgeData: TransitionData): (Boolean, Int) = {
+//            val sourceStateType = source.data.stateType
+//            var isUpdated = false
+//            var num = 0
+//            // 只有一条边
+//            if (onlyOneTransition.contains(sourceStateType)) {
+//                val allTransitions = source.data.directChildrenTransitionsMap ++ source.data.nonDirectChildrenTransitionsMap
+//                //allTransitions -= edgeData
+//                allTransitions.foreach(edge => {
+//                    if (edge.transitionType == "normal") {
+//                        num += 1
+//                    }
+//                })
+//                if (num >= 2) {
+//                    isUpdated = false
+//                } else {
+//                    isUpdated = true
+//                }
+//            }
+//            // 只有两条边
+//            if (onlyTwoTransitions == sourceStateType) {
+//                val allTransitions = source.data.directChildrenTransitionsMap ++ source.data.nonDirectChildrenTransitionsMap
+//                //allTransitions -= edgeData
+//                allTransitions.foreach(edge => {
+//                    if (edge.transitionType == "normal") {
+//                        num += 1
+//                    }
+//                })
+//                if (num <= 2) {
+//                    isUpdated = true
+//                } else {
+//                    isUpdated = false
+//                }
+//            }
+//
+//            // 多条边
+//            if (multipleTransition.contains(sourceStateType)) {
+//                isUpdated = true
+//                num = 0
+//            }
+////            (isUpdated, num)
+//            //自改
+//            (true, num)
+//        }
 
         /*
         选中事件比较复杂，包括state和transition
          */
         def selectedEvent(graph: Graph): Callback = {
             if (graph.isInstanceOf[Arrow]) {
+                println(s"label状态: ${graph.asInstanceOf[Arrow]}, name: ${graph.asInstanceOf[Arrow].data.information.relatedSubjectName}, msg: ${graph.asInstanceOf[Arrow].data.information.relatedMessageType}")
                 preState = null
-                if (isSelected == null) {
-                    isSelected = graph
-                    val target = isSelected.asInstanceOf[Arrow]
+                if (preSelected == null) {
+                    preSelected = graph
+                    val target = preSelected.asInstanceOf[Arrow]
                     recordTransitionInformation(target)
                     target.changeColor
                 } else {
-                    if (!isSelected.isInstanceOf[Arrow]) { // 前一个是state，现在选中的是Transition
-                        restoreStateData(isSelected.asInstanceOf[StateGraph])
-                        checkIsStartPoint(isSelected.asInstanceOf[StateGraph])
-                        isSelected = graph
-                        val target = isSelected.asInstanceOf[Arrow]
+                    if (!preSelected.isInstanceOf[Arrow]) { // 前一个是state，现在选中的是Transition
+                        restoreStateData(preSelected.asInstanceOf[StateGraph])
+                        checkIsStartPoint(preSelected.asInstanceOf[StateGraph])
+                        preSelected = graph
+                        val target = preSelected.asInstanceOf[Arrow]
                         recordTransitionInformation(target)
                         target.changeColor
                     } else { //前一个是Transition，现在也是Transition
-                        if (isSelected.asInstanceOf[Arrow].data.ID == graph.asInstanceOf[Arrow].data.ID) { // 消除Transition选中状态
-                            restoreTransitionData(isSelected.asInstanceOf[Arrow])
-                            isSelected.asInstanceOf[Arrow].resetColor
-                            isSelected = null
+                        if (preSelected.asInstanceOf[Arrow].data.ID == graph.asInstanceOf[Arrow].data.ID) { // 消除Transition选中状态
+                            restoreTransitionData(preSelected.asInstanceOf[Arrow])
+                            preSelected.asInstanceOf[Arrow].resetColor
+                            preSelected = null
                             originalTransitionData = null
                         } else {
-                            restoreTransitionData(isSelected.asInstanceOf[Arrow])
-                            isSelected.asInstanceOf[Arrow].resetColor
-                            isSelected = graph
-                            val target = isSelected.asInstanceOf[Arrow]
+                            restoreTransitionData(preSelected.asInstanceOf[Arrow])
+                            preSelected.asInstanceOf[Arrow].resetColor
+                            preSelected = graph
+                            val target = preSelected.asInstanceOf[Arrow]
                             recordTransitionInformation(target)
                             target.changeColor
                         }
                     }
                 }
             } else {
+                println(s"state状态: ${graph.asInstanceOf[StateGraph]}")
                 // 当前选中的是state状态
-                if (isSelected != null) {
-                    if (isSelected.isInstanceOf[StateGraph]) { // 前一个是state,当前也是一个state
-                        if (isSelected.asInstanceOf[StateGraph].data.ID == graph.asInstanceOf[StateGraph].data.ID) {
+                if (preSelected != null) {
+                    if (preSelected.isInstanceOf[StateGraph]) { // 前一个是state,当前也是一个state
+                        if (preSelected.asInstanceOf[StateGraph].data.ID == graph.asInstanceOf[StateGraph].data.ID) {
                             if (preState == null) {
-                                dom.console.info("消除选中状态")
-                                checkIsStartPoint(isSelected.asInstanceOf[StateGraph])
-                                restoreStateData(isSelected.asInstanceOf[StateGraph])
-                                isSelected = null
+                                checkIsStartPoint(preSelected.asInstanceOf[StateGraph])
+                                restoreStateData(preSelected.asInstanceOf[StateGraph])
+                                preSelected = null
                                 originalStateData = null
                             } else {
-                                // todo loop还没做好
-                                dom.console.info("点击自己形成环" + preState.data.ID)
+                                // loop还没做好
                                 val target = graph.asInstanceOf[StateGraph]
                                 if (defaultStateList.contains(target)) {
                                     Callback.alert("The current state must be connected by other states.")
@@ -1596,22 +1697,21 @@ object InternalBehaviorPage {
                                 }
                             }
                         } else { // 前一个state和现在不一样，还原之前的
-                            restoreStateData(isSelected.asInstanceOf[StateGraph]) // 前一个state的数据还原
-                            checkIsStartPoint(isSelected.asInstanceOf[StateGraph])
-                            isSelected = graph
+                            restoreStateData(preSelected.asInstanceOf[StateGraph]) // 前一个state的数据还原
+                            checkIsStartPoint(preSelected.asInstanceOf[StateGraph])
+                            preSelected = graph
                             // 开始自己的state操作
-                            val target = isSelected.asInstanceOf[StateGraph]
+                            val target = preSelected.asInstanceOf[StateGraph]
                             target.changeBorder
                             recordStateData(target)
                             if (preState == null) {
-                                dom.console.info("There is no preState to need to be connected.")
                             } else {
-                                if (defaultStateList.contains(target)) {
+                                if (defaultStateList.contains(target) && !currentStartNode.contains(target.data.id)) {
                                     defaultStateList -= target
                                     target.deep = preState.deep + 1
                                     target.parentID = preState.data.id
                                     preState.childrenList += target.data.id // 直接子节点列表
-                                    // Todo 先创建TransitionData,在根据它绘制箭头
+                                    // 先创建TransitionData,在根据它绘制箭头
                                     val newTransitionData = TransitionData(getTransitionId(), preState.data.ID, target.data.ID)
                                     // 加入直接子节点
                                     preState.data.addDirectChildrenTransition(newTransitionData)
@@ -1619,13 +1719,12 @@ object InternalBehaviorPage {
                                     preState.arrowsToTarget += newTransitionData.id
                                     target.arrowsFromSource += newTransitionData.id
                                 } else {
-                                    // TODO 移除假的起点，加入主树
+                                    // 移除假的起点，加入主树
                                     if (isolatedNodeList.contains(target.data.id)) {
                                         currentStartNode -= target.data.id
                                         isolatedNodeList -= target.data.id
                                         target.parentID = preState.data.id
                                         target.deep = (preState.deep + 1)
-                                        target.resetBackgroundColor
                                         preState.childrenList += target.data.id
                                         searchTree(target)
                                         // todo 连接孤立节点，create a new transition,当前孤立节点变成preState的直接子节点
@@ -1635,9 +1734,9 @@ object InternalBehaviorPage {
                                         target.arrowsFromSource += newTransitionData.id
 
                                     } else {
-                                        // todo 先做没有孤立节点的情况
+                                        // 先做没有孤立节点的情况
                                         // 当前节点已经在之前的节点的子孙列表中出现过
-                                        if (preState.descendantList.contains(target.data.id)) {
+                                        if (preState.descendantList.contains(target.data.id) || currentStartNode.contains(target.data.id)) {
                                             var num = 0
                                             preState.descendantList.foreach(d => {
                                                 if (d == target.data.id) {
@@ -1659,31 +1758,31 @@ object InternalBehaviorPage {
                                         preState.descendantList += target.data.id
                                     }
                                 }
-                                if (currentStartNode.size > 1) {
-                                    newDummyNode
-                                }
+//                                if (currentStartNode.size > 1) {
+//                                    newDummyNode
+//                                }
                                 treeLayout(findRootNode)
                                 preState = null // 完成连接
                             }
                         }
                     } else {
                         // 前一个是Transition，现在是state
-                        restoreTransitionData(isSelected.asInstanceOf[Arrow])
-                        isSelected.asInstanceOf[Arrow].resetColor
-                        isSelected = graph
+                        restoreTransitionData(preSelected.asInstanceOf[Arrow])
+                        preSelected.asInstanceOf[Arrow].resetColor
+                        preSelected = graph
                         // 开始自己的state操作
-                        val target = isSelected.asInstanceOf[StateGraph]
+                        val target = preSelected.asInstanceOf[StateGraph]
                         target.changeBorder
                         recordStateData(target)
                     }
                 } else { // 当前isSelected是null
-                    isSelected = graph
-                    if (isSelected.isInstanceOf[StateGraph]) {
-                        val target = isSelected.asInstanceOf[StateGraph]
+                    preSelected = graph
+                    if (preSelected.isInstanceOf[StateGraph]) {
+                        val target = preSelected.asInstanceOf[StateGraph]
                         recordStateData(target)
                         target.changeBorder
                     } else {
-                        val target = isSelected.asInstanceOf[Arrow]
+                        val target = preSelected.asInstanceOf[Arrow]
                         recordTransitionInformation(target)
                         target.changeColor
                     }
@@ -1693,10 +1792,12 @@ object InternalBehaviorPage {
         }
 
         def onDoubleClickEvent(graph: StateGraph): TagMod = {
+//            ^.onDoubleClick --> ctl.refresh
             ^.onDoubleClick --> editCallMacro(graph)
         }
 
         def editCallMacro(graph: StateGraph) = Callback {
+            println("macro test.")
             ProcessManager.processMap(processID).subjectMap(subjectID).callMacroMap += (graph.data.id -> ListBuffer[StateGraph]())
             val url = "http://localhost:8080/#subjectsView/processidtest/" + subjectID + "/" + graph.data.id
             dom.window.location.href = url
@@ -1710,31 +1811,36 @@ object InternalBehaviorPage {
             }
         }
 
-        var symbolCenter: Map[String, (Int, Int)] = Map(
-            "Receive" -> (20, 20),
-            "Send" -> (20, 20),
-            "ModalJoin" -> (20, 20),
-            "ModalSplit" -> (20, 20),
-            "Action" -> (40, 20),
-            "CloseIP" -> (40, 20),
-            "Tau" -> (40, 20),
-            "OpenIP" -> (40, 20),
-            "CloseAllIPs" -> (40, 20),
-            "OpenAllIPs" -> (40, 20),
-            "SelectAgents" -> (40, 20),
-            "CallMacro" -> (40, 20),
-            "VarMan" -> (40, 20),
-            "Cancel" -> (40, 20),
-            "End" -> (22, 22),
-            "IsIPEmpty" -> (31, 37)
-        )
+        def symbolCenter(t: String): (Int, Int) =
+            t match {
+                case "Receive" => (20, 20)
+                case "Send" => (20, 20)
+                case "ModalJoin" => (20, 20)
+                case "ModalSplit" => (20, 20)
+                case "Action" => (40, 20)
+                case "CloseIP" => (40, 20)
+                case "Tau" => (40, 20)
+                case "OpenIP" => (40, 20)
+                case "CloseAllIPs" => (40, 20)
+                case "OpenAllIPs" => (40, 20)
+                case "SelectAgents" => (40, 20)
+                case "CallMacro" => (40, 20)
+                case "VarMan" => (40, 20)
+                case "Cancel" => (40, 20)
+                case "End" => (22, 22)
+                case "IsIPEmpty" => (31, 37)
+                case _ => (0,0)
+            }
+
+
+
 
         def getSymbolCenter(s: StateGraph): (Int, Int) = {
             if (s.data.stateType == "Action") {
                 if (s.data.stateName.length <= 8) {
                     symbolCenter(s.data.stateType)
                 } else {
-                    ((s.data.stateName.length * 10) / 2, 20)
+                    ((Math.min(s.data.stateName.length, maxNameLength) * 8) / 2, 20)
                 }
             } else {
                 symbolCenter(s.data.stateType)
@@ -1743,7 +1849,6 @@ object InternalBehaviorPage {
 
 
         def determineTransition(currentState: StateGraph) = {
-            dom.console.info("我是树型布局第五步: ")
             val startCenter = getSymbolCenter(currentState)
             var arrowSourceX = 0
             var arrowSourceY = 0
@@ -1751,22 +1856,22 @@ object InternalBehaviorPage {
             var arrowTargetY = 0
             var childSource = -2
             var childTarget = -2
-            val directChildrenMap: Map[(Int, Int), TransitionData] = Map()
+            val directChildrenMap: Map[(Int, Int), ListBuffer[TransitionData]] = Map()
             val nonDirectChildrenMap: Map[(Int, Int), ListBuffer[TransitionData]] = Map()
-            val directChildren = currentState.data.directChildrenTransitionsList
-            val nonDirectChildren = currentState.data.nonDirectChildrenTransitionsList
+            val directChildren = currentState.data.directChildrenTransitionsMap.values
+            val nonDirectChildren = currentState.data.nonDirectChildrenTransitionsMap.values
 
             for (elem <- directChildren) {
-                directChildrenMap += (elem.source, elem.target) -> elem
+                directChildrenMap += (elem.head.source, elem.head.target) -> elem
             }
             for (elem <- nonDirectChildren) {
-                val s = elem.source
-                val t = elem.target
+                val s = elem.head.source
+                val t = elem.head.target
                 if (nonDirectChildrenMap.contains((s, t))) {
-                    nonDirectChildrenMap((s, t)) += elem
+                    nonDirectChildrenMap((s, t)) ++= elem
                 } else {
                     nonDirectChildrenMap += (s, t) -> ListBuffer()
-                    nonDirectChildrenMap((s, t)) += elem
+                    nonDirectChildrenMap((s, t)) ++= elem
                 }
             }
 
@@ -1776,27 +1881,32 @@ object InternalBehaviorPage {
                 if (currentChildrenList.size == 1) {
                     val end = stateMap(currentChildrenList.head)
                     val endCenter = getSymbolCenter(end)
-                    arrowSourceX = currentState.sx + startCenter._1
+                    arrowTargetX = end.sx + endCenter._1
                     arrowSourceY = currentState.sy + startCenter._2 * 2
-                    arrowTargetX = arrowSourceX
+                    arrowSourceX = arrowTargetX
                     if (end.data.stateType == "IsIPEmpty") {
                         arrowTargetY = end.sy - 12
                     } else {
                         arrowTargetY = end.sy
                     }
-                    val fineTuningEndX = arrowSourceX - endCenter._1
-                    end.setCoordinate(fineTuningEndX, end.sy)
+                    val fineTuningStartX = arrowSourceX - startCenter._1
+                    currentState.setCoordinate(fineTuningStartX, currentState.sy)
+                    println(s"start: ${currentState.data.id}, x: $arrowSourceX. end: ${end.data.id}, x: $arrowTargetX")
                     childSource = currentState.data.id
                     childTarget = end.data.id
                     recordStateData(end)
                     if (directChildrenMap.contains((childSource, childTarget))) {
                         val edgeData = directChildrenMap((childSource, childTarget))
-                        val arrow = new GraphObject.Arrow(processID, subjectID, edgeData, arrowSourceX, arrowSourceY, arrowTargetX, arrowTargetY, "1")
+                        val arrow = new GraphObject.Arrow(processID, subjectID, edgeData.head, arrowSourceX, arrowSourceY, arrowTargetX, arrowTargetY, "1")
                         arrowMap += (arrow.data.ID -> arrow)
                     } else {
                         dom.console.info("这是画唯一直接子节点， TransitionData 和现在 start and end 不一样")
                     }
                 } else {
+                    val firstChild = stateMap(currentChildrenList.head)
+                    val lastChild = stateMap(currentChildrenList.last)
+                    val x = (firstChild.sx + getSymbolCenter(firstChild)._1 + lastChild.sx + getSymbolCenter(lastChild)._1) / 2 - getSymbolCenter(currentState)._1
+                    currentState.setX(x)
                     currentChildrenList.foreach(chl => {
                         val currentChild = stateMap(chl)
                         val childCenter = getSymbolCenter(currentChild)
@@ -1804,7 +1914,7 @@ object InternalBehaviorPage {
                         if (currentState.data.stateType == "IsIPEmpty") {
                             arrowSourceY = (currentChild.sy - 58)
                         } else {
-                            arrowSourceY = (currentChild.sy - 90) //todo 暂定 80箭头固定长度
+                            arrowSourceY = (currentChild.sy - 90) //暂定 80箭头固定长度
                         }
 
                         arrowTargetX = currentChild.sx + childCenter._1
@@ -1813,17 +1923,15 @@ object InternalBehaviorPage {
                         childTarget = currentChild.data.id
                         if (directChildrenMap.contains((childSource, childTarget))) {
                             val edgeData = directChildrenMap((childSource, childTarget))
-                            val arrow = new GraphObject.Arrow(processID, subjectID, edgeData, arrowSourceX, arrowSourceY, arrowTargetX, arrowTargetY, "1")
+                            val arrow = new GraphObject.Arrow(processID, subjectID, edgeData.head, arrowSourceX, arrowSourceY, arrowTargetX, arrowTargetY, "1")
                             arrowMap += (arrow.data.ID -> arrow)
                             recordStateData(currentChild)
                         } else {
                             dom.console.info("这是画唯一直接子节点， TransitionData 和现在 start and end 不一样")
                         }
-                        dom.console.info("坐标出现问题了 " + currentChild.sx + "  Y  " + currentChild.sy)
+                        dom.console.info("坐标出现问题了 " + arrowSourceX + "  Y  " + currentChild.sy)
                     })
                 }
-            } else {
-                dom.console.info("这里的错误么")
             }
 
             if (!currentState.descendantList.isEmpty) {
@@ -1836,11 +1944,64 @@ object InternalBehaviorPage {
                     childSource = currentState.data.id
                     childTarget = dsc.data.id
 
-                    // todo 边界左下箭头
-                    if (((dscDeep - currentState.deep) >= 1) && (currentState.sx >= dscX)) {
+                    // 左横向箭头
+                    if((dscDeep == currentState.deep) && (currentState.sx > dsc.sx + mu)){
                         val arrowStartX = currentState.sx
                         val arrowStartY = currentState.sy + startCenter._2
+                        val arrowEndX = dsc.sx + + dscCenter._1 * 2
+                        val arrowEndY = dsc.sy + dscCenter._2
+
+                        if (nonDirectChildrenMap.contains((childSource, childTarget))) {
+                            val edgeData = nonDirectChildrenMap((childSource, childTarget))
+                            for (elem <- edgeData) {
+                                val arrow = new GraphObject.Arrow(processID, subjectID, elem, arrowStartX, arrowStartY, arrowEndX, arrowEndY, "9")
+                                arrowMap += (arrow.data.ID -> arrow)
+                            }
+                        } else {
+                            dom.console.info("左箭头有问题")
+                        }
+                    }
+
+                    // 右横向箭头
+                    if((dscDeep == currentState.deep) && (currentState.sx + mu < dsc.sx)){
+                        val arrowStartX = currentState.sx + startCenter._1 * 2
+                        val arrowStartY = currentState.sy + startCenter._2
                         val arrowEndX = dsc.sx
+                        val arrowEndY = dsc.sy + dscCenter._2
+
+                        if (nonDirectChildrenMap.contains((childSource, childTarget))) {
+                            val edgeData = nonDirectChildrenMap((childSource, childTarget))
+                            for (elem <- edgeData) {
+                                val arrow = new GraphObject.Arrow(processID, subjectID, elem, arrowStartX, arrowStartY, arrowEndX, arrowEndY, "10")
+                                arrowMap += (arrow.data.ID -> arrow)
+                            }
+                        } else {
+                            dom.console.info("右箭头有问题")
+                        }
+                    }
+                    //右下左箭头
+                    if (((dscDeep - currentState.deep) >= 1) && ((currentState.sx + startCenter._1 - dsc.sx - dscCenter._1 <= mu) && (currentState.sx + startCenter._1 - dsc.sx - dscCenter._1 >= mu * -1))) {
+                        val arrowStartX = currentState.sx + startCenter._1 * 2
+                        val arrowStartY = currentState.sy + startCenter._2
+                        val arrowEndX = dsc.sx + dscCenter._1 * 2
+                        val arrowEndY = dsc.sy + dscCenter._2
+
+                        if (nonDirectChildrenMap.contains((childSource, childTarget))) {
+                            dom.console.info("右下左箭头")
+                            val edgeData = nonDirectChildrenMap((childSource, childTarget))
+                            for (elem <- edgeData) {
+                                val arrow = new GraphObject.Arrow(processID, subjectID, elem, arrowStartX, arrowStartY, arrowEndX, arrowEndY, "4")
+                                arrowMap += (arrow.data.ID -> arrow)
+                            }
+                        } else {
+                            dom.console.info("右下左箭头有问题")
+                        }
+                    }
+                    // 左下箭头
+                    if (((dscDeep - currentState.deep) >= 1) && (currentState.sx + startCenter._1 - dsc.sx - dscCenter._1 > mu )) {
+                        val arrowStartX = currentState.sx + startCenter._1
+                        val arrowStartY = currentState.sy + startCenter._2 * 2
+                        val arrowEndX = dsc.sx + dscCenter._1 * 2
                         val arrowEndY = dsc.sy + dscCenter._2
 
                         if (nonDirectChildrenMap.contains((childSource, childTarget))) {
@@ -1872,7 +2033,7 @@ object InternalBehaviorPage {
 
                     }
                     // todo 边界左上箭头
-                    if ((dscDeep - currentState.deep <= -1) && (currentState.sx <= dscX)) {
+                    if ((dscDeep - currentState.deep <= -1) && (currentState.sx + startCenter._1  <=  dscX + dscCenter._1 + mu)) {
                         val arrowStartX = currentState.sx
                         val arrowStartY = currentState.sy + startCenter._2
                         val arrowEndX = dsc.sx
@@ -1889,7 +2050,7 @@ object InternalBehaviorPage {
                         }
                     }
                     // todo 边界右上箭头
-                    if ((dscDeep - currentState.deep <= -1) && (currentState.sx > dscX)) {
+                    if ((dscDeep - currentState.deep <= -1) && (currentState.sx + startCenter._1 > dscX + dscCenter._1 + mu)) {
                         val arrowStartX = currentState.sx + (startCenter._1 * 2)
                         val arrowStartY = currentState.sy + startCenter._2
                         val arrowEndX = dsc.sx + (dscCenter._1 * 2)
@@ -1906,16 +2067,14 @@ object InternalBehaviorPage {
                         }
                     }
                 })
-            } else {
             }
-
         }
 
         val circle: ListBuffer[String] = ListBuffer("Send", "Receive", "ModalJoin", "ModalSplit")
 
         def connectState: Callback = {
-            if (isSelected.isInstanceOf[StateGraph]) {
-                preState = isSelected.asInstanceOf[StateGraph]
+            if (preSelected.isInstanceOf[StateGraph]) {
+                preState = preSelected.asInstanceOf[StateGraph]
                 if (defaultStateList.contains(preState)) {
                     Callback.alert("Please select the previous action first!")
                 } else {
@@ -1959,29 +2118,33 @@ object InternalBehaviorPage {
                                 target.asInstanceOf[StateGraph].deep = 0
                                 target.asInstanceOf[StateGraph].parentID = (-100)
                                 currentStartNode += target.data.id // startNode
-                                isSelected = updateStateData(target) // 第一个节点改变，坐标不在坐标集合中
-                                treeLayout(isSelected.asInstanceOf[StateGraph].data.id)
+                                preSelected = updateStateData(target) // 第一个节点改变，坐标不在坐标集合中
+                                treeLayout(preSelected.asInstanceOf[StateGraph].data.id)
                                 defaultStateList -= target
                             } else {
-                                dom.console.info("I'm not the first StartState!")
                                 // todo 产生虚拟节点
+                                multistart = true
                                 val specialStateID = -100
                                 val sd = new StateData(specialStateID)
                                 val dummyState = new GraphObject.DummyNode(processID, subjectID, sd)
-                                statesList += dummyState
-                                stateMap += dummyState.data.id -> dummyState
+                                virtualStart = dummyState
+//                                statesList += dummyState
+//                                stateMap += dummyState.data.id -> dummyState
                                 currentStartNode += target.data.id
-                                currentStartNode.foreach(start => dummyState.childrenList += start)
-                                isSelected = updateStateData(target)
+                                currentStartNode.foreach(start => {
+                                    dummyState.childrenList += start
+                                    stateMap(start).parentID = specialStateID
+                                })
+                                preSelected = updateStateData(target)
+                                preState = null
                                 target.deep = 0
-                                val root = findRootNode
-                                treeLayout(root)
+                                treeLayout(specialStateID)
                                 defaultStateList -= target
                             }
                             $.modState(s => s)
                         } else { // 非起始点并且也存在其他节点
                             if (existStart) {
-                                isSelected = updateStateData(target)
+                                preSelected = updateStateData(target)
                                 $.modState(s => s)
                             } else Callback.alert("Please select StartState!")
                         }
@@ -1991,27 +2154,29 @@ object InternalBehaviorPage {
                             //起始点可能被修改
                             Callback.alert(" The current state is StartState. After modifying the flow chart can't execute normally!")
                         } else {
-                            isSelected = updateStateData(target)
+                            preSelected = updateStateData(target)
                             $.modState(s => s)
                         }
                     }
-                } else Callback.alert("更新时，当前状态与更新状态不一样")
+                }else{
+                    Callback()
+                }
             } else { // update transition
                 val target = selectedObject.asInstanceOf[Arrow]
                 val currentData = target.data
                 val sourceState = stateMap(currentData.source)
-                val checkResult = tipInformation(sourceState, target.data)
-                if (checkResult._1) {
+//                val checkResult = tipInformation(sourceState, target.data)
+//                if (checkResult._1) {
                     val newTransitionData: RestoreTransitionData = RestoreTransitionData()
                     newTransitionData.copy(currentData)
                     originalTransitionData = (currentData.ID, true, newTransitionData)
-                } else {
-                    tipRelatedInformation = sourceState.data.stateType + " can only have " + (checkResult._2 - 1).toString + " normal transition."
-                    if (originalTransitionData._1 == target.data.id) {
-                        target.data.copy(originalTransitionData._3)
-                    }
-                    originalTransitionData = (currentData.ID, true, originalTransitionData._3)
-                }
+//                } else {
+//                    tipRelatedInformation = sourceState.data.stateType + " can only have " + (checkResult._2 - 1).toString + " normal transition."
+//                    if (originalTransitionData._1 == target.data.id) {
+//                        target.data.copy(originalTransitionData._3)
+//                    }
+//                    originalTransitionData = (currentData.ID, true, originalTransitionData._3)
+//                }
 
                 $.modState(s => s)
             }
@@ -2053,19 +2218,19 @@ object InternalBehaviorPage {
                 createNewState.childrenList = s.childrenList
                 createNewState.descendantList = s.descendantList
                 createNewState.sign = s.sign
-                val oldDirectTransitions = s.data.directChildrenTransitionsList
-                val oldNonDirectTransitions = s.data.nonDirectChildrenTransitionsList
+                val oldDirectTransitions = s.data.directChildrenTransitionsMap.values
+                val oldNonDirectTransitions = s.data.nonDirectChildrenTransitionsMap.values
                 //reset all transition's data
                 oldDirectTransitions.foreach(edge => {
-                    edge.resetTransition
-                    arrowMap(edge.id).resetColor
+                    edge.head.resetTransition
+                    arrowMap(edge.head.id).resetColor
                 })
                 oldNonDirectTransitions.foreach(edge => {
-                    edge.resetTransition
-                    arrowMap(edge.id).resetColor
+                    edge.head.resetTransition
+                    arrowMap(edge.head.id).resetColor
                 })
-                createNewState.data.directChildrenTransitionsList = oldDirectTransitions.clone()
-                createNewState.data.nonDirectChildrenTransitionsList = oldNonDirectTransitions.clone()
+                createNewState.data.directChildrenTransitionsMap = s.data.directChildrenTransitionsMap
+                createNewState.data.nonDirectChildrenTransitionsMap = s.data.nonDirectChildrenTransitionsMap
 
             } else {
                 // state's symbol has no change
@@ -2098,14 +2263,16 @@ object InternalBehaviorPage {
         //      Callback()
         //    }
 
-        def saveSubject(): Callback = {
-            autoLayout = false
-            arrowMap.valuesIterator.foreach(_.rpst = false)
+        def treeLayout(): Callback = {
             statesList.foreach(_.rpst = false)
+            arrowMap.valuesIterator.foreach(_.rpst = false)
+            autoLayout = false
+            treeLayout(findRootNode)
             $.modState(s => s)
         }
 
-        def loadSubject(): Callback = {
+
+        def rpstLayout(): Callback = {
             //      val xhr = new dom.XMLHttpRequest()
             //      xhr.onreadystatechange = {(e: dom.Event) =>
             //        if(xhr.readyState == 200){
@@ -2116,36 +2283,29 @@ object InternalBehaviorPage {
             //      xhr.open("Get", "http://localhost:8081/load", true)
             //      xhr.send()
             autoLayout = true
-            var g = new RGraph
+            val g = new RGraph
             g.createMateInfo()
             val s2v: Map[StateGraph, Vertex] = Map()
             val v2s: Map[Vertex, StateGraph] = Map()
-            dom.console.info(s"RPST1 ")
             for (s <- statesList) {
                 var v: Vertex = null
                 if (s2v.contains(s)) {
-                    dom.console.info("RPST2 ")
                     v = s2v(s)
                 } else {
-                    dom.console.info("RPST3 ")
-                    v = Vertex(s.data.stateName)
+                    v = new Vertex(s.data.stateName)
                     g.addVertex(v)
                     s2v += (s -> v)
                     v2s += (v -> s)
                 }
-                dom.console.info(s"s: ${s.data.stateName}, arrow to target: ${s.arrowsToTarget} ")
 
                 for (id <- s.arrowsToTarget) {
-                    dom.console.info("RPST4 " + id)
-                    var cid = arrowMap(id).data.target
-                    var child = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap(cid)
-                    dom.console.info("RPST41 " + child)
+                    val cid = arrowMap(id).data.target
+                    val child = ProcessManager.processMap(processID).subjectMap(subjectID).stateMap(cid)
                     var w: Vertex = null
                     if (s2v.contains(child)) {
                         w = s2v(child)
                     } else {
-                        dom.console.info("RPST5 ")
-                        w = Vertex(child.data.stateName)
+                        w = new Vertex(child.data.stateName)
                         g.addVertex(w)
                         s2v += (child -> w)
                         v2s += (w -> child)
@@ -2158,9 +2318,8 @@ object InternalBehaviorPage {
             val rpst = new RPST(g, s2v, v2s, arrowMap)
             rpst.start()
             Layout.init(rpst)
-            Layout.CalculateSpace(statesList, arrowMap.valuesIterator.toList)
+            Layout.PreProcess(statesList, arrowMap.valuesIterator.toList)
             Layout.start()
-            dom.console.info("RPSTROOT: " + rpst.rpstroot)
             $.modState(s => s)
         }
 
@@ -2188,6 +2347,7 @@ object InternalBehaviorPage {
                             s.graphWidth = s.asInstanceOf[GraphObject.Action].changeWidth(originalStateData._3.name)
                         }
                     }
+                    originalStateData = null
                 } else {
                     dom.console.info("It is not necessary to restore stateData.")
                 }
@@ -2239,12 +2399,26 @@ object InternalBehaviorPage {
                 sub.stateList.foreach(state => {
                     if (state.isInstanceOf[GraphObject.Send] || state.isInstanceOf[GraphObject.Receive]) {
                         val communicationState = state.asInstanceOf[StateGraph]
-                        communicationState.data.directChildrenTransitionsList.foreach(edge => {
-                            val exchangedMessage = edge.information.relatedMessageType
-                            if (exchangedMessage != "") {
-                                allMessageTypeSet += exchangedMessage
-                            }
+                        communicationState.data.directChildrenTransitionsMap.foreach(edge => {
+                            edge._2.foreach(f => allMessageTypeSet += f.information.relatedMessageType)
+//                            val exchangedMessage = edge.information.relatedMessageType
+//                            if (exchangedMessage.nonEmpty) {
+//                                allMessageTypeSet += exchangedMessage
+//                            }
                         })
+                        communicationState.data.nonDirectChildrenTransitionsMap.foreach(edge => {
+                            edge._2.foreach(f => allMessageTypeSet += f.information.relatedMessageType)
+//                            val exchangedMessage = edge.information.relatedMessageType
+//                            if (exchangedMessage.nonEmpty) {
+//                                allMessageTypeSet += exchangedMessage
+//                            }
+                        })
+//                        communicationState.arrowsToTarget.foreach(edge => {
+//                            val exchangedMessage = arrowMap(edge).data.information.relatedMessageType
+//                            if (exchangedMessage != "") {
+//                                allMessageTypeSet += exchangedMessage
+//                            }
+//                        })
                     }
                 })
             })
@@ -2257,8 +2431,8 @@ object InternalBehaviorPage {
                 val sourceStateID = currentTransition.data.source
                 val sourceState = stateMap(sourceStateID)
                 if (sourceState.data.stateType == "Send" || sourceState.data.stateType == "Receive") {
-                    currentTransition.data.information.setRelatedMessageType(msg)
-                    currentTransition.data.information.setAction(sourceState.data.stateType)
+                    currentTransition.data.information.addRelatedMessageType(msg)
+                    currentTransition.data.information.setActionType(sourceState.data.stateType)
                 }
             }
             $.modState(s => s)
@@ -2273,8 +2447,8 @@ object InternalBehaviorPage {
                 if (availableState.contains(sourceState.data.stateType)) {
                     originalTransitionData = (originalTransitionData._1, false, originalTransitionData._3)
                     if (sourceState.data.stateType == "Send" || sourceState.data.stateType == "Receive") {
-                        currentTransition.data.information.setRelatedMessageType(newMessageType)
-                        currentTransition.data.information.setAction(sourceState.data.stateType)
+                        currentTransition.data.information.addRelatedMessageType(newMessageType)
+                        currentTransition.data.information.setActionType(sourceState.data.stateType)
                     } else {
                         currentTransition.data.inputPoolOperationObject.setRelatedMessageType(newMessageType)
                     }
@@ -2293,11 +2467,9 @@ object InternalBehaviorPage {
                 if (availableState.contains(sourceState.data.stateType)) {
                     originalTransitionData = (originalTransitionData._1, false, originalTransitionData._3)
                     if (sourceState.data.stateType == "Send" || sourceState.data.stateType == "Receive") {
-                        currentTransition.data.information.setRelatedSubjectName(newSubjectName)
-                        currentTransition.data.information.setAction(sourceState.data.stateType)
-                        dom.console.info("我加在了Send or Receive 里" + newSubjectName)
+                        currentTransition.data.information.addRelatedSubjectName(newSubjectName)
+                        currentTransition.data.information.setActionType(sourceState.data.stateType)
                     } else {
-                        dom.console.info("我加在了inputPool 里" + newSubjectName)
                         currentTransition.data.inputPoolOperationObject.setRelatedSubjectName(newSubjectName)
                     }
                 }
@@ -2364,34 +2536,64 @@ object InternalBehaviorPage {
             isMessage
         }
 
+        def multiTransionsList: TagMod = {
+            if((preSelected != null) && (preSelected.isInstanceOf[Arrow])){
+                val td = preSelected.asInstanceOf[Arrow].data
+                val sd = stateMap(td.source).data
+                if(sd.directChildrenTransitionsMap.contains(td.target)){
+                    sd.directChildrenTransitionsMap(td.target).toTagMod{mt =>
+                        <.option(sd.directChildrenTransitionsMap(td.target).indexOf(mt))
+                    }
+                }else if(sd.nonDirectChildrenTransitionsMap.contains(td.target)){
+                    sd.nonDirectChildrenTransitionsMap(td.target).toTagMod{mt =>
+                        <.option(sd.nonDirectChildrenTransitionsMap(td.target).indexOf(mt))
+                    }
+                }else{
+                    <.option()
+                }
+            }else{
+                <.option()
+            }
+        }
 
-        def transitionMsgT() = {
+        def getSelectTransition(s: Graph)(e: ReactEventFromInput): Callback = {
+            if((s != null) && (s.isInstanceOf[Arrow])){
+                val td = s.asInstanceOf[Arrow].data
+                val sd = stateMap(td.source).data
+                if(sd.directChildrenTransitionsMap.contains(td.target)){
+                    val selectedTransitionData: TransitionData = sd.directChildrenTransitionsMap(td.target)(e.target.value.toInt)
+                    s.asInstanceOf[Arrow].changeData(selectedTransitionData)
+                }else if(sd.nonDirectChildrenTransitionsMap.contains(td.target)){
+                    val selectedTransitionData: TransitionData = sd.nonDirectChildrenTransitionsMap(td.target)(e.target.value.toInt)
+                    s.asInstanceOf[Arrow].changeData(selectedTransitionData)
+                }else{
+                    //
+                }
+            }else{
+                //
+            }
+            $.modState(s => s)
+        }
+
+        def transitionMsgT = {
             allMessageTypeSet.clear()
             collectAllMessageTypes
             allMessageTypeSet.toTagMod { mt =>
-                <.option(mt,
-                    if (isSelected != null && isSelected.isInstanceOf[Arrow]) {
-                        val msg = checkSourceState(isSelected.asInstanceOf[Arrow], 1)
-                        if (msg == mt) {
-                            ^.selected := true
-                        } else {
-                            ^.selected := false
-                        }
-                    } else {
-                        ^.selected := false
-                    }
+                <.option(
+                    mt,
+                    ^.selected := false
                 )
             }
         }
 
-        def transitionRelatedS() = {
+        def transitionRelatedS = {
             allSubjectsSet.clear()
             ProcessManager.processMap(processID).subjectList.foreach(s => allSubjectsSet += s.name)
             allSubjectsSet.toTagMod { s =>
                 <.option(
                     s,
-                    if ((isSelected != null) && (isSelected.isInstanceOf[Arrow])) {
-                        val msg = checkSourceState(isSelected.asInstanceOf[Arrow], 2)
+                    if ((preSelected != null) && (preSelected.isInstanceOf[Arrow])) {
+                        val msg = checkSourceState(preSelected.asInstanceOf[Arrow], 2)
                         if (msg == s) {
                             ^.selected := true
                         } else {
@@ -2425,6 +2627,7 @@ object InternalBehaviorPage {
             if (t.isInstanceOf[Arrow]) {
                 originalTransitionData = (originalTransitionData._1, false, originalTransitionData._3)
                 t.asInstanceOf[Arrow].data.timeout = newTimeout.toInt
+                t.asInstanceOf[Arrow].data.label = newTimeout + "s"
             }
             $.modState(s => s)
         }

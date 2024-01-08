@@ -1,15 +1,57 @@
 package de.tkip.sbpm.frontend
 
+import de.tkip.sbpm.frontend.LayoutAlgorithm.{RGraph, Vertex}
+import de.tkip.sbpm.frontend.graph.Graph
 import org.scalajs.dom.html
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.html_<^._
-import org.scalajs.dom, dom.MouseEvent
+import org.scalajs.dom
+import dom.MouseEvent
 
 object LayoutTest {
     //
     //  def content = SingleSide.Content(source, Main2())
     //
     //  val source = GhPagesMacros.exampleSource
+
+    def testGraph(): RGraph = {
+        val g = new RGraph
+
+        val vertices = Array.tabulate(14)(i => new Vertex((i).toString))
+
+        for(v <- vertices){
+            g.addVertex(v)
+        }
+        g.vertices -= vertices(0)
+
+        g.addEdge(vertices(1), vertices(2))
+        g.addEdge(vertices(1), vertices(4))
+        g.addEdge(vertices(1), vertices(8))
+        g.addEdge(vertices(1), vertices(13))
+        g.addEdge(vertices(1), vertices(12))
+        g.addEdge(vertices(2), vertices(3))
+        g.addEdge(vertices(2), vertices(13))
+        g.addEdge(vertices(3), vertices(4))
+        g.addEdge(vertices(3), vertices(13))
+        g.addEdge(vertices(4), vertices(5))
+        g.addEdge(vertices(4), vertices(6))
+        g.addEdge(vertices(4), vertices(7))
+        g.addEdge(vertices(5), vertices(6))
+        g.addEdge(vertices(5), vertices(7))
+        g.addEdge(vertices(5), vertices(8))
+        g.addEdge(vertices(6), vertices(7))
+        g.addEdge(vertices(8), vertices(9))
+        g.addEdge(vertices(8), vertices(11))
+        g.addEdge(vertices(8), vertices(12))
+        g.addEdge(vertices(9), vertices(10))
+        g.addEdge(vertices(9), vertices(11))
+        g.addEdge(vertices(9), vertices(12))
+        g.addEdge(vertices(10), vertices(11))
+        g.addEdge(vertices(10), vertices(12))
+
+        g
+
+    }
 
     def component = ScalaComponent.static("Test example")(
         <.div(

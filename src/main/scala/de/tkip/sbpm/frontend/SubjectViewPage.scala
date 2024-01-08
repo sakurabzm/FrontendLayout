@@ -324,8 +324,8 @@ object SubjectViewPage {
                         <.option("Action"),
                         <.option("Send"),
                         <.option("Receive"),
-                        <.option("Modal join"),
-                        <.option("Modal split"),
+                        <.option("ModalJoin"),
+                        <.option("ModalSplit"),
                         <.option("End")
                     ),
                     <.br,
@@ -649,7 +649,7 @@ object SubjectViewPage {
 
 
         /*
-        手动初始化
+        init
          */
         val state1 = new StateGraph(1, OuterX / 2 - 50, 20, "A")
         val state2 = new StateGraph(2, OuterX / 2 - 50, 180, "A")
@@ -682,7 +682,7 @@ object SubjectViewPage {
         var currentState: State = getStartState()
         storeStates.map(s => states += s.asInstanceOf[StateGraph]) //测试能否互相转换
         /*
-        初始化结束
+        init end
         */
 
         dom.console.info("loaded Subject Page1")
@@ -863,7 +863,7 @@ object SubjectViewPage {
                 OuterDiv.withRef(outerRef)(
                     leftSide,
                     rightSide,
-                    footer,
+//                    footer,
                     body,
                     //            State(OuterX/2 - 50, 20, "A").state,
                     //            Arrow_Vertical(OuterX/2 - 75, 120).arrow

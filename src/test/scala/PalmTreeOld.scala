@@ -508,7 +508,6 @@ object PalmTreeOld extends App {
             } else if ((v.num > w.num) && ((w.num != u.num) || (v.flag == false))) {
 
                 palmtree += ((v, w))
-                //        println("check: father: " + v.num + " son: " + w.num)
                 if (w.num < v.lowpt1) {
                     v.lowpt2 = v.lowpt1
                     v.lowpt1 = w.num

@@ -20,7 +20,7 @@ case class RestoreTransitionData() {
         this.transitionType = data.transitionType
         this.priority = data.priority
         this.timeout = data.timeout
-        this.description = data.description
+        this.description = data.label
         this.agentInformation = data.agent
         this.activatedStateIDInformation = data.activatedStateID
         this.exchangedInformation.copy(data.information)
@@ -31,13 +31,22 @@ case class RestoreTransitionData() {
 }
 
 case class ExchangedInformation() {
-    var action: String = ""
+    var actionType: String = ""
     var relatedSubjectName: String = ""
     var relatedMessageType: String = ""
+//    var relatedSubjectId: Int = 0
     var sendingNum: Int = 1
 
-    def setAction(a: String): Unit = {
-        action = a
+    def setActionType(a: String): Unit = {
+        actionType = a
+    }
+
+    def addRelatedSubjectName(sub: String): Unit = {
+        relatedSubjectName = sub
+    }
+
+    def addRelatedMessageType(msg: String): Unit = {
+        relatedMessageType = msg
     }
 
     def setRelatedSubjectName(sub: String): Unit = {
@@ -48,21 +57,27 @@ case class ExchangedInformation() {
         relatedMessageType = msg
     }
 
+//    def setRelatedSubjectId(id: Int): Unit = {
+//        relatedSubjectId = id
+//    }
+
     def setNum(n: Int) = {
         sendingNum = n
     }
 
     def resetMessage: Unit = {
-        this.action = ""
+        this.actionType = ""
         this.relatedSubjectName = ""
         this.relatedMessageType = ""
+//        this.relatedSubjectId = 0
         this.sendingNum = 1
     }
 
     def copy(data: ExchangedInformation): Unit = {
-        this.action = data.action
+        this.actionType = data.actionType
         this.relatedSubjectName = data.relatedSubjectName
         this.relatedMessageType = data.relatedMessageType
+//        this.relatedSubjectId = data.relatedSubjectId
         this.sendingNum = data.sendingNum
     }
 
@@ -128,11 +143,12 @@ case class VariableData() {
     }
 }
 
+
 case class TransitionData(id: Int, s: Int, t: Int) {
     val ID = id
-    var transitionType = ""
+    var transitionType = "normal"
     var priority: Int = 0
-    var description = ""
+    var label = ""
     var source = s
     var target = t
     var timeout = 0
@@ -142,17 +158,18 @@ case class TransitionData(id: Int, s: Int, t: Int) {
     var agent: String = ""
     var activatedStateID: Int = 0
     var repeatTimes = -2
+    var multiTransitions = false
 
     def init(ttype: String, prio: Int, desc: String, timeo: Int): Unit ={
         transitionType = ttype
         priority = prio
-        description = desc
+        label = desc
         timeout = timeo
     }
 
     def resetTransition: Unit = {
         this.transitionType = ""
-        this.description = ""
+        this.label = ""
         this.priority = 0
         this.timeout = 0
         this.information.resetMessage
@@ -171,7 +188,7 @@ case class TransitionData(id: Int, s: Int, t: Int) {
     }
 
     def setDescription(s: String) = {
-        description = s
+        label = s
     }
 
     def setTimeout(t: Int) = {
@@ -182,15 +199,24 @@ case class TransitionData(id: Int, s: Int, t: Int) {
         activatedStateID = t
     }
 
+    def setMultiTransitions(t: Boolean): Unit ={
+        multiTransitions = t
+    }
+
     def copy(data: RestoreTransitionData): Unit = {
         this.transitionType = data.transitionType
         this.priority = data.priority
         this.timeout = data.timeout
-        this.description = data.description
+        this.label = data.description
         this.agent = data.agentInformation
         this.activatedStateID = data.activatedStateIDInformation
         this.information.copy(data.exchangedInformation)
         this.inputPoolOperationObject.copy(data.inputPoolInformation)
         this.variableOperation.copy(data.variableInformation)
+    }
+
+    override def equals(o: Any) = o match {
+        case that: TransitionData => that.id == this.id
+        case _ => false
     }
 }

@@ -56,11 +56,12 @@ object AppRouter extends JSApp {
         (emptyRule
                 | staticRoute(root, Home) ~> render(TemplateTest.component())
                 | staticRoute("#test", Process) ~> render(LayoutTest.component())
-                | staticRoute("#subjects", Home) ~> render(HomePage.component(""))
-                | staticRoute("#templatetest", TemplateTestE) ~> render(TemplateTest.component()) // HU
-                | dynamicRouteCT("#subjectsView" / string("[a-zA-Z0-9]+").caseClass[SubjectsVP]) ~> dynRender(SubjectsV.component(_)) // HU
-                | dynamicRouteCT("#subjectsView" / (string("[a-zA-Z0-9]+") / string("[a-zA-Z0-9]+") / int).caseClass[BehaviorPage]) ~> dynRender(InternalBehaviorPage.component(_)) // HU
-                //| dynamicRouteCT("#subjectsView" / (string("[a-zA-Z0-9]+") / string("[a-zA-Z0-9]+")).caseClass[BehaviorPage]) ~> dynRender(InternalBehaviorPage.component(_)) // HU
+//                | staticRoute("#subjects", Home) ~> render(HomePage.component(""))
+                | staticRoute("#templatetest", TemplateTestE) ~> render(TemplateTest.component())
+                | dynamicRouteCT("#subjectsView" / string("[a-zA-Z0-9]+").caseClass[SubjectsVP]) ~> dynRender(SubjectsV.component(_))
+                | dynamicRouteCT("#subjectsView" / (string("[a-zA-Z0-9]+") / string("[a-zA-Z0-9]+") / int).caseClass[BehaviorPage]) ~> dynRender(InternalBehaviorPage.component(_))
+
+                //| dynamicRouteCT("#subjectsView" / (string("[a-zA-Z0-9]+") / string("[a-zA-Z0-9]+")).caseClass[BehaviorPage]) ~> dynRender(InternalBehaviorPage.component(_))
                 // | dynamicRouteCT("#subjects" / int.caseClass[SubjectPages]) ~> dynRender(SubjectViewPage.component(_))
                 | itemRoutes
                 ).notFound(redirectToPage(Home)(Redirect.Replace))
@@ -76,6 +77,7 @@ object AppRouter extends JSApp {
 
     def layout(c: RouterCtl[AppPage], r: Resolution[AppPage]) =
         <.div(
+            ^.margin := 0.px,
             TopNav(TopNav.Props(mainMenu, r.page, c)),
             r.render(),
             Footer()
