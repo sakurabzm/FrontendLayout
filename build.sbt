@@ -10,7 +10,7 @@ lazy val client = project.enablePlugins(ScalaJSPlugin, ScalaJSWeb)
 
 name := "FrontendLayout"
 
-version := "0.5.0"
+version := "1.5.0"
 
 scalaVersion := "2.12.6"
 
